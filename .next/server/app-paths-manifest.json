@@ -1,0 +1,6 @@
+{
+  "/[locale]/bibliotheque/page": "app/[locale]/bibliotheque/page.js",
+  "/[locale]/page": "app/[locale]/page.js",
+  "/[locale]/upload/page": "app/[locale]/upload/page.js",
+  "/[locale]/prepa/page": "app/[locale]/prepa/page.js"
+}

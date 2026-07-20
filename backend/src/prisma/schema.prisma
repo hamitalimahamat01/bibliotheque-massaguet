@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============= MODÈLES =============
+
+model User {
+  id              String   @id @default(uuid())
+  name            String
+  email           String   @unique
+  password        String
+  role            Role     @default(USER)
+  bio             String?
+  avatar          String?
+  avatarKey       String?
+  isActive        Boolean  @default(true)
+  lastLogin       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  books           Book[]
+  downloads       Download[]
+  favorites       Favorite[]
+  reviews         Review[]
+  notifications   Notification[]
+  refreshTokens   RefreshToken[]
+
+  @@map("users")
+}
+
+model Book {
+  id              String   @id @default(uuid())
+  title           String
+  description     String?
+  author          String
+  categoryId      String?
+  subCategory     String?
+  subject         String?
+  fileType        String
+  fileUrl         String
+  fileKey         String
+  fileName        String
+  fileSize        Int
+  coverUrl        String?
+  coverKey        String?
+  year            String?
+  downloads       Int      @default(0)
+  views           Int      @default(0)
+  isPublished     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  uploadedBy      User     @relation(fields: [uploadedById], references: [id])
+  uploadedById    String
+  category        Category? @relation(fields: [categoryId], references: [id])
+  downloadsHistory Download[]
+  favorites       Favorite[]
+  reviews         Review[]
+
+  @@index([title])
+  @@index([author])
+  @@index([categoryId])
+  @@index([createdAt(sort: Desc)])
+  @@map("books")
+}
+
+model Category {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  slug            String   @unique
+  description     String?
+  icon            String?
+  color           String?
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  // Relations
+  books           Book[]
+
+  @@map("categories")
+}
+
+model Download {
+  id              String   @id @default(uuid())
+  userId          String
+  bookId          String
+  downloadedAt    DateTime @default(now())
+  ipAddress       String?
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  book            Book     @relation(fields: [bookId], references: [id])
+
+  @@unique([userId, bookId])
+  @@map("downloads")
+}
+
+model Favorite {
+  id              String   @id @default(uuid())
+  userId          String
+  bookId          String
+  createdAt       DateTime @default(now())
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  book            Book     @relation(fields: [bookId], references: [id])
+
+  @@unique([userId, bookId])
+  @@map("favorites")
+}
+
+model Review {
+  id              String   @id @default(uuid())
+  userId          String
+  bookId          String
+  rating          Int      @default(0)
+  comment         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  book            Book     @relation(fields: [bookId], references: [id])
+
+  @@map("reviews")
+}
+
+model Notification {
+  id              String   @id @default(uuid())
+  userId          String
+  title           String
+  message         String
+  type            NotificationType @default(INFO)
+  isRead          Boolean  @default(false)
+  link            String?
+  createdAt       DateTime @default(now())
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model RefreshToken {
+  id              String   @id @default(uuid())
+  userId          String
+  token           String   @unique
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  revokedAt       DateTime?
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ============= ENUMS =============
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
