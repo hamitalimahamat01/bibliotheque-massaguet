@@ -2,10 +2,7 @@ import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 
-console.log('🔧 Configuration NextAuth chargée');
-console.log('📌 GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✅ Défini' : '❌ Non défini');
-
-export const authOptions = {
+const handler = NextAuth({
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || '',
@@ -45,8 +42,8 @@ export const authOptions = {
   
   callbacks: {
     async signIn({ user, account }) {
-      console.log('🔐 signIn - Provider:', account?.provider, 'Email:', user?.email);
       if (account?.provider === 'google') {
+        console.log('Connexion Google:', user.email);
         return true;
       }
       return true;
@@ -58,7 +55,6 @@ export const authOptions = {
         token.email = user.email;
         token.name = user.name;
         token.role = 'USER';
-        token.provider = 'google';
       }
       
       if (user) {
@@ -100,7 +96,6 @@ export const authOptions = {
   
   debug: process.env.NODE_ENV === 'development',
   secret: process.env.NEXTAUTH_SECRET || 'development_secret_key',
-};
+});
 
-const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
