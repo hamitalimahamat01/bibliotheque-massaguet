@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
@@ -12,11 +11,21 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+console.log('🚀 Démarrage du serveur...');
+console.log('📌 PORT:', PORT);
+console.log('📌 DATABASE_URL:', process.env.DATABASE_URL ? '✅ Défini' : '❌ Non défini');
+
 // PostgreSQL Connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
+let pool;
+try {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+  console.log('✅ PostgreSQL configuré');
+} catch (error) {
+  console.error('❌ Erreur configuration PostgreSQL:', error.message);
+}
 
 // Middleware
 app.use(cors({
@@ -42,6 +51,9 @@ const auth = (req, res, next) => {
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
+    if (!pool) {
+      throw new Error('Pool non initialisé');
+    }
     await pool.query('SELECT 1');
     res.json({ 
       status: 'OK', 
@@ -49,6 +61,7 @@ app.get('/api/health', async (req, res) => {
       database: '✅ Connecté à Neon'
     });
   } catch (error) {
+    console.error('❌ Erreur health check:', error.message);
     res.status(500).json({ 
       status: 'ERROR', 
       message: 'Erreur de connexion à la base de données',
@@ -78,7 +91,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     res.json({ success: true, token, user });
   } catch (error) {
-    console.error('Erreur register:', error);
+    console.error('❌ Erreur register:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -103,7 +116,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({ success: true, token, user });
   } catch (error) {
-    console.error('Erreur login:', error);
+    console.error('❌ Erreur login:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -119,7 +132,7 @@ app.get('/api/auth/profile', auth, async (req, res) => {
     }
     res.json({ success: true, user: result.rows[0] });
   } catch (error) {
-    console.error('Erreur profile:', error);
+    console.error('❌ Erreur profile:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -130,7 +143,7 @@ app.get('/api/documents/stats', async (req, res) => {
     const result = await pool.query('SELECT COUNT(*) as total FROM books');
     res.json({ success: true, stats: { documents: parseInt(result.rows[0].total) || 0 } });
   } catch (error) {
-    console.error('Erreur stats:', error);
+    console.error('❌ Erreur stats:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -174,7 +187,7 @@ app.get('/api/books', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erreur books:', error);
+    console.error('❌ Erreur books:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -184,8 +197,17 @@ if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
 
-app.listen(PORT, () => {
-  console.log(`🚀 Serveur: http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Serveur: http://0.0.0.0:${PORT}`);
   console.log('📊 Base de données: PostgreSQL (Neon)');
   console.log('📁 Uploads: ./uploads');
+});
+
+// Gestion des erreurs non capturées
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection:', reason);
 });
