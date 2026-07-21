@@ -50,6 +50,7 @@ const handler = NextAuth({
     },
     
     async jwt({ token, user, account }) {
+      // Connexion Google
       if (account?.provider === 'google' && user) {
         token.id = user.id || `google_${Date.now()}`;
         token.email = user.email;
@@ -57,10 +58,12 @@ const handler = NextAuth({
         token.role = 'USER';
       }
       
+      // Connexion Credentials
       if (user) {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+        // @ts-ignore - rôle ajouté dynamiquement
         token.role = user.role || 'USER';
       }
       
@@ -72,6 +75,7 @@ const handler = NextAuth({
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        // @ts-ignore - rôle ajouté dynamiquement
         session.user.role = token.role as string;
       }
       return session;
