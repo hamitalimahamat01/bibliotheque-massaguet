@@ -2,6 +2,15 @@ import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 
+// Forcer l'URL de production
+const isProduction = process.env.NODE_ENV === 'production';
+const baseUrl = isProduction 
+  ? 'https://bibliotheque-frontend-ec0x.onrender.com'
+  : 'http://localhost:3000';
+
+console.log('🔧 Environnement:', process.env.NODE_ENV);
+console.log('🔧 Base URL:', baseUrl);
+
 const handler = NextAuth({
   providers: [
     GoogleProvider({
@@ -43,7 +52,7 @@ const handler = NextAuth({
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === 'google') {
-        console.log('Connexion Google:', user.email);
+        console.log('✅ Connexion Google:', user.email);
         return true;
       }
       return true;
@@ -68,17 +77,25 @@ const handler = NextAuth({
     },
     
     async session({ session, token }) {
-      session.user.id = token.id;
-      session.user.email = token.email;
-      session.user.name = token.name;
-      session.user.role = token.role;
+      if (session.user) {
+        session.user.id = token.id;
+        session.user.email = token.email;
+        session.user.name = token.name;
+        session.user.role = token.role;
+      }
       return session;
     },
     
-    async redirect({ url, baseUrl }) {
-      if (url.startsWith('/')) return `${baseUrl}${url}`;
-      else if (new URL(url).origin === baseUrl) return url;
-      return baseUrl;
+    async redirect({ url, baseUrl: base }) {
+      console.log('🔄 Redirection:', { url, base });
+      // Utiliser l'URL forcée
+      const finalBase = isProduction 
+        ? 'https://bibliotheque-frontend-ec0x.onrender.com'
+        : 'http://localhost:3000';
+      
+      if (url.startsWith('/')) return `${finalBase}${url}`;
+      else if (new URL(url).origin === finalBase) return url;
+      return finalBase;
     }
   },
   
@@ -92,8 +109,10 @@ const handler = NextAuth({
     maxAge: 30 * 24 * 60 * 60,
   },
   
-  debug: process.env.NODE_ENV === 'development',
+  debug: true,
   secret: process.env.NEXTAUTH_SECRET || 'development_secret_key',
+  // Forcer l'URL
+  url: baseUrl,
 });
 
 export { handler as GET, handler as POST };
