@@ -7,9 +7,6 @@ const dotenv = require('dotenv');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 const app = express();
@@ -22,21 +19,12 @@ const pool = new Pool({
 });
 
 // Middleware
-app.use(helmet());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
 }));
-app.use(morgan('combined'));
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-});
-app.use('/api', limiter);
 
 // ===== AUTH =====
 const auth = (req, res, next) => {
@@ -52,8 +40,21 @@ const auth = (req, res, next) => {
 };
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'API Bibliothèque Massaguet' });
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ 
+      status: 'OK', 
+      message: 'API Bibliothèque Massaguet (PostgreSQL)',
+      database: '✅ Connecté à Neon'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'ERROR', 
+      message: 'Erreur de connexion à la base de données',
+      error: error.message
+    });
+  }
 });
 
 // ===== AUTH ROUTES =====
