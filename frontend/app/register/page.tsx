@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -16,16 +16,14 @@ export default function RegisterPage() {
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const { register, user } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (user) {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
+  if (user) {
+    router.push('/dashboard');
+    return null;
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -68,12 +66,8 @@ export default function RegisterPage() {
     try {
       await register(form.name, form.email, form.password);
       toast.success('Inscription réussie !');
-      toast('📧 Un email de confirmation a été envoyé à votre adresse', {
-        duration: 5000,
-        icon: '📧',
-      });
       router.push('/dashboard');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erreur d\'inscription:', error);
     } finally {
       setLoading(false);
@@ -83,7 +77,6 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 auth-gradient">
       <div className="w-full max-w-[440px] animate-slide-up">
-        {/* Logo et titre */}
         <div className="text-center mb-10">
           <div className="logo-float inline-block">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#2d2d44] flex items-center justify-center mx-auto shadow-xl shadow-[#1a1a2e]/10">
@@ -98,7 +91,6 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* Carte principale */}
         <div className="auth-card rounded-3xl p-8 shine">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -149,7 +141,7 @@ export default function RegisterPage() {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <svg className="w-4 h-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="w-4 h-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0110 0v4" />
                   </svg>
@@ -170,12 +162,12 @@ export default function RegisterPage() {
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-300 hover:text-gray-500 transition-colors"
                 >
                   {showPassword ? (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
                       <line x1="1" y1="1" x2="23" y2="23" />
                     </svg>
                   ) : (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
@@ -190,42 +182,24 @@ export default function RegisterPage() {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <svg className="w-4 h-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="w-4 h-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0110 0v4" />
                   </svg>
                 </div>
                 <input
-                  type={showConfirmPassword ? 'text' : 'password'}
+                  type="password"
                   name="confirmPassword"
                   value={form.confirmPassword}
                   onChange={handleChange}
-                  className="w-full pl-11 pr-12 py-3.5 auth-input rounded-2xl text-sm text-gray-800 placeholder:text-gray-300 focus:outline-none"
+                  className="w-full pl-11 pr-4 py-3.5 auth-input rounded-2xl text-sm text-gray-800 placeholder:text-gray-300 focus:outline-none"
                   placeholder="••••••••"
                   required
                   disabled={loading}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-300 hover:text-gray-500 transition-colors"
-                >
-                  {showConfirmPassword ? (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
               </div>
             </div>
 
-            {/* Conditions */}
             <div className="flex items-start gap-3">
               <input
                 type="checkbox"
@@ -234,21 +208,14 @@ export default function RegisterPage() {
                 className="w-4 h-4 mt-0.5 text-gray-700 border-gray-300 rounded focus:ring-gray-400"
               />
               <label className="text-xs text-gray-400 leading-relaxed">
-                J'accepte les{' '}
-                <Link href="/terms" className="text-gray-600 hover:text-gray-800 transition-colors">
-                  conditions d'utilisation
-                </Link>{' '}
-                et la{' '}
-                <Link href="/privacy" className="text-gray-600 hover:text-gray-800 transition-colors">
-                  politique de confidentialité
-                </Link>
+                J'accepte les conditions d'utilisation
               </label>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 auth-btn-primary rounded-2xl font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full py-3.5 auth-btn-primary rounded-2xl font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -264,25 +231,15 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          {/* Bas de carte */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-400">
-              Déjà un compte ?
-              {' '}
-              <Link
-                href="/login"
-                className="text-gray-600 font-medium hover:text-gray-800 transition-colors"
-              >
+              Déjà un compte ?{' '}
+              <Link href="/login" className="text-gray-600 font-medium hover:text-gray-800">
                 Se connecter
               </Link>
             </p>
           </div>
         </div>
-
-        {/* Footer */}
-        <p className="text-center text-xs text-gray-400/60 mt-8 tracking-wide">
-          Bibliothèque Massaguet • Rejoignez la communauté
-        </p>
       </div>
     </div>
   );
