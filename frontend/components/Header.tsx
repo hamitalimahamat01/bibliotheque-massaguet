@@ -107,20 +107,13 @@ export default function Header() {
                 )}
               </div>
             ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="text-gray-600 hover:text-indigo-600 transition-colors text-sm font-medium"
-                >
-                  Connexion
-                </Link>
-                <Link
-                  href="/register"
-                  className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:shadow-lg transition-all text-sm font-medium"
-                >
-                  Inscription
-                </Link>
-              </>
+              <Link
+                href="/login"
+                className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white px-5 py-2.5 rounded-lg hover:shadow-lg transition-all text-sm font-medium flex items-center gap-2"
+              >
+                <Icons.Login className="w-4 h-4" />
+                Connexion
+              </Link>
             )}
           </div>
 
@@ -184,24 +177,14 @@ export default function Header() {
                   </button>
                 </>
               ) : (
-                <>
-                  <Link
-                    href="/login"
-                    className="text-gray-600 hover:text-indigo-600 flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Icons.Login className="w-5 h-5" />
-                    Connexion
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="text-indigo-600 font-medium flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Icons.Register className="w-5 h-5" />
-                    Inscription
-                  </Link>
-                </>
+                <Link
+                  href="/login"
+                  className="text-indigo-600 font-medium flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Icons.Login className="w-5 h-5" />
+                  Connexion
+                </Link>
               )}
             </div>
           </div>
