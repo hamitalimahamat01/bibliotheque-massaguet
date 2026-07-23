@@ -22,7 +22,7 @@ const pool = new Pool({
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || '*',
   credentials: true,
 }));
 app.use(express.json());
@@ -44,11 +44,10 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'image/jpeg', 'image/png', 'image/webp'];
   const allowedExts = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
   const ext = path.extname(file.originalname).toLowerCase();
   
-  if (allowedTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
+  if (allowedExts.includes(ext)) {
     cb(null, true);
   } else {
     cb(new Error('Format de fichier non supporté'), false);
@@ -63,13 +62,23 @@ const upload = multer({
 
 // ===== AUTH MIDDLEWARE =====
 const auth = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Token manquant' });
+  const authHeader = req.headers.authorization;
+  console.log('🔐 Auth header:', authHeader ? 'Présent' : 'Absent');
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token manquant ou invalide' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  console.log('🔐 Token:', token ? 'Présent' : 'Absent');
+  
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    console.log('🔐 Utilisateur décodé:', decoded.email);
     req.user = decoded;
     next();
-  } catch {
+  } catch (error) {
+    console.error('❌ Erreur token:', error.message);
     res.status(401).json({ error: 'Token invalide' });
   }
 };
@@ -96,6 +105,7 @@ app.get('/api/health', async (req, res) => {
 // Inscription
 app.post('/api/auth/register', async (req, res) => {
   try {
+    console.log('📝 Inscription:', req.body.email);
     const { name, email, password } = req.body;
     
     const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -126,6 +136,7 @@ app.post('/api/auth/register', async (req, res) => {
 // Connexion
 app.post('/api/auth/login', async (req, res) => {
   try {
+    console.log('🔐 Tentative de connexion:', req.body.email);
     const { email, password } = req.body;
     
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -192,21 +203,33 @@ app.put('/api/auth/profile', auth, async (req, res) => {
 
 // ===== DOCUMENTS ROUTES =====
 
-// Upload d'un document (avec couverture)
+// Upload d'un document
 app.post('/api/books', auth, upload.fields([
   { name: 'file', maxCount: 1 },
   { name: 'cover', maxCount: 1 }
 ]), async (req, res) => {
   try {
+    console.log('📤 Upload document reçu');
+    console.log('📄 Body:', req.body);
+    console.log('📁 Fichiers:', req.files ? Object.keys(req.files) : 'Aucun');
+    
     const files = req.files;
     const file = files && files.file ? files.file[0] : null;
     const cover = files && files.cover ? files.cover[0] : null;
 
     if (!file) {
+      console.log('❌ Aucun fichier');
       return res.status(400).json({ error: 'Aucun fichier téléchargé' });
     }
 
+    console.log('📄 Fichier:', file.originalname, file.size);
+
     const { title, description, author, category, subCategory, subject, year } = req.body;
+
+    if (!title || !author) {
+      console.log('❌ Titre ou auteur manquant');
+      return res.status(400).json({ error: 'Titre et auteur sont requis' });
+    }
 
     // Déterminer le type de fichier
     const ext = path.extname(file.originalname).toLowerCase();
@@ -218,27 +241,27 @@ app.post('/api/books', auth, upload.fields([
     };
     const fileType = fileTypeMap[ext] || 'pdf';
 
-    // URL de la couverture
     const coverUrl = cover ? `/uploads/${cover.filename}` : null;
-    const coverKey = cover ? cover.filename : null;
 
-    // Créer le document dans la base de données
+    console.log('💾 Sauvegarde dans la base de données...');
+
     const result = await pool.query(
       `INSERT INTO books 
        (title, description, author, category, sub_category, subject, 
         file_type, file_url, file_key, file_name, file_size, 
-        cover_url, cover_key, uploaded_by, uploaded_by_name, year)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        cover_url, uploaded_by, uploaded_by_name, year)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id, title, author, file_url, cover_url`,
       [
         title, description || '', author, category || 'general', 
         subCategory || '', subject || '',
         fileType, `/uploads/${file.filename}`, file.filename,
         file.originalname, file.size,
-        coverUrl, coverKey, req.user.id, req.user.name || 'Anonyme', year || ''
+        coverUrl, req.user.id, req.user.name || 'Anonyme', year || ''
       ]
     );
 
+    console.log('✅ Document créé:', result.rows[0].id);
     res.status(201).json({
       success: true,
       message: 'Document partagé avec succès',
@@ -256,7 +279,7 @@ app.post('/api/books', auth, upload.fields([
         fs.unlinkSync(files.cover[0].path);
       }
     }
-    res.status(500).json({ error: 'Erreur lors du téléchargement' });
+    res.status(500).json({ error: 'Erreur lors du téléchargement: ' + error.message });
   }
 });
 
