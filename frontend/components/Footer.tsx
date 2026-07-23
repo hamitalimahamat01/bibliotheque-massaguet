@@ -22,7 +22,7 @@ export default function Footer() {
             </p>
             <div className="mt-4 flex gap-3">
               <Icons.Book className="w-6 h-6 text-gray-500" />
-              <Icons.Team className="w-6 h-6 text-gray-500" />
+              <Icons.User className="w-6 h-6 text-gray-500" />
               <Icons.Star className="w-6 h-6 text-gray-500" />
             </div>
           </div>
@@ -56,7 +56,7 @@ export default function Footer() {
                 massaguet@bibliotheque.com
               </li>
               <li className="text-gray-400 flex items-center gap-2">
-                <Icons.Team className="w-4 h-4" />
+                <Icons.User className="w-4 h-4" />
                 Rejoignez-nous
               </li>
             </ul>
