@@ -1,8 +1,9 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import CredentialsProvider from "next-auth/providers/credentials";
 
-console.log("🚀 Route NextAuth chargée");
+console.log("🔧 NextAuth route chargée");
+console.log("📌 GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID ? "✅ Défini" : "❌ Non défini");
+console.log("📌 NEXTAUTH_URL:", process.env.NEXTAUTH_URL);
 
 const handler = NextAuth({
   providers: [
@@ -14,53 +15,42 @@ const handler = NextAuth({
           prompt: "select_account",
           access_type: "offline",
           response_type: "code",
-        },
-      },
-    }),
-    CredentialsProvider({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Mot de passe", type: "password" },
-      },
-      async authorize(credentials) {
-        // Simulation pour le test - à connecter à votre backend
-        if (credentials?.email === "demo@massaguet.com" && credentials?.password === "demo123") {
-          return { id: "1", name: "Demo", email: "demo@massaguet.com", role: "USER" };
         }
-        return null;
-      },
+      }
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = user.role;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      session.user.id = token.id;
-      session.user.role = token.role;
-      return session;
+    async signIn({ user, account, profile }) {
+      console.log("🔄 signIn:", { provider: account?.provider, email: user?.email });
+      // Accepter toutes les tentatives de connexion
+      return true;
     },
     async redirect({ url, baseUrl }) {
-      // Logique de redirection simple et fiable
+      console.log("🔄 redirect:", { url, baseUrl });
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       else if (new URL(url).origin === baseUrl) return url;
       return baseUrl;
     },
+    async session({ session, token }) {
+      console.log("🔄 session:", { user: session?.user?.email });
+      return session;
+    },
+    async jwt({ token, user, account }) {
+      console.log("🔄 jwt:", { hasUser: !!user, hasAccount: !!account, provider: account?.provider });
+      if (account?.provider === "google" && user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+      }
+      return token;
+    },
   },
+  secret: process.env.NEXTAUTH_SECRET || "secret",
+  debug: true,
   pages: {
     signIn: "/login",
     error: "/login",
   },
-  session: {
-    strategy: "jwt",
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-  debug: true,
 });
 
 export { handler as GET, handler as POST };

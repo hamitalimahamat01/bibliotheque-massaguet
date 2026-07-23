@@ -1,38 +1,46 @@
-# Node.js
+# Node
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Next.js
+.next/
+out/
+dist/
+build/
+
+# Environment - TOUS les .env sont exclus !
 .env
 .env.local
-.env.*.local
+.env.production
+.env.development
+.env.test
 
-# Prisma
+# Backend
 backend/node_modules/
-backend/.env
-backend/prisma/*.db
-backend/prisma/*.sqlite
-backend/prisma/migrations/*.sqlite
-
-# Frontend
-frontend/node_modules/
-frontend/.env
-frontend/build/
-frontend/dist/
-frontend/.next/
-
-# Logs
-logs/
-*.log
-
-# OS files
-.DS_Store
-Thumbs.db
+backend/uploads/
+backend/*.db
+backend/*.sqlite
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-frontend/.env.production
-.env.production
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Misc
+*.pid
+*.seed
+*.pid.lock
+
+# Exception pour les fichiers .example
+!.env.example
