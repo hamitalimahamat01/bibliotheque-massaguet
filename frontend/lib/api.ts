@@ -81,3 +81,4 @@ export const statsApi = {
 };
 
 export default api;
+  toggleFavorite: (id: string) => api.post(`/books/${id}/favorite`),
