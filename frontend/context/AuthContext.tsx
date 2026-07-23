@@ -1,13 +1,16 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, signIn, signOut } from 'next-auth/react';
+import { authApi } from '@/lib/api';
+import toast from 'react-hot-toast';
 
 interface User {
   id: string;
   name: string;
   email: string;
   image?: string;
+  role?: string;
   provider?: string;
   isAuthenticated?: boolean;
   firstName?: string;
@@ -21,6 +24,10 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  logout: () => void;
+  updateProfile: (data: Partial<User>) => Promise<void>;
   setUser: (user: User | null) => void;
 }
 
@@ -43,7 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: session.user.name || '',
         email: session.user.email || '',
         image: session.user.image || '',
-        provider: session.user.provider || 'google',
+        role: (session.user as any)?.role || 'USER',
+        provider: (session.user as any)?.provider || 'google',
         isAuthenticated: true,
       });
     } else {
@@ -52,12 +60,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, [session, status]);
 
+  const login = async (email: string, password: string) => {
+    try {
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        toast.error('Email ou mot de passe incorrect');
+        throw new Error(result.error);
+      }
+
+      toast.success('Connexion réussie !');
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur de connexion');
+      throw error;
+    }
+  };
+
+  const register = async (name: string, email: string, password: string) => {
+    try {
+      const res: any = await authApi.register({ name, email, password });
+      localStorage.setItem('token', res.data.token);
+      setUser(res.data.user);
+      toast.success('Inscription réussie !');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Erreur d\'inscription');
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut({ redirect: false });
+      localStorage.removeItem('token');
+      setUser(null);
+      toast.success('Déconnexion réussie');
+    } catch (error) {
+      console.error('Erreur déconnexion:', error);
+    }
+  };
+
+  const updateProfile = async (data: Partial<User>) => {
+    try {
+      const res: any = await authApi.updateProfile(data);
+      setUser(res.data.user);
+      toast.success('Profil mis à jour');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Erreur de mise à jour');
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         isAuthenticated: !!user,
+        login,
+        register,
+        logout,
+        updateProfile,
         setUser,
       }}
     >
