@@ -198,9 +198,9 @@ app.post('/api/books', auth, upload.fields([
   { name: 'cover', maxCount: 1 }
 ]), async (req, res) => {
   try {
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-    const file = files.file?.[0];
-    const cover = files.cover?.[0];
+    const files = req.files;
+    const file = files && files.file ? files.file[0] : null;
+    const cover = files && files.cover ? files.cover[0] : null;
 
     if (!file) {
       return res.status(400).json({ error: 'Aucun fichier téléchargé' });
@@ -247,13 +247,14 @@ app.post('/api/books', auth, upload.fields([
   } catch (error) {
     console.error('❌ Erreur upload:', error);
     // Supprimer les fichiers en cas d'erreur
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const files = req.files;
     if (files) {
-      Object.values(files).flat().forEach(f => {
-        if (f.path && fs.existsSync(f.path)) {
-          fs.unlinkSync(f.path);
-        }
-      });
+      if (files.file && files.file[0] && files.file[0].path && fs.existsSync(files.file[0].path)) {
+        fs.unlinkSync(files.file[0].path);
+      }
+      if (files.cover && files.cover[0] && files.cover[0].path && fs.existsSync(files.cover[0].path)) {
+        fs.unlinkSync(files.cover[0].path);
+      }
     }
     res.status(500).json({ error: 'Erreur lors du téléchargement' });
   }
