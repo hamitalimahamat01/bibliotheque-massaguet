@@ -1,199 +1,180 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { booksApi } from '@/lib/api';
-import Link from 'next/link';
-import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
-  const { user, updateProfile, logout } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(user?.name || '');
-  const [bio, setBio] = useState(user?.bio || '');
+  const { data: session, status } = useSession();
+  const { user } = useAuth();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [userBooks, setUserBooks] = useState<any[]>([]);
-  const [loadingBooks, setLoadingBooks] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    gender: '',
+    city: '',
+    birthDate: '',
+  });
 
-  if (!user) {
-    return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-600 mb-4">Connectez-vous</h2>
-        <Link href="/login" className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700">
-          Se connecter
-        </Link>
-      </div>
-    );
-  }
+  useEffect(() => {
+    // Si l'utilisateur n'est pas connecté, rediriger vers login
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
 
-  const handleSave = async () => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
+
     try {
-      await updateProfile({ name, bio });
-      setIsEditing(false);
+      // Sauvegarder les informations dans la base de données
+      const response = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          email: session?.user?.email,
+          name: session?.user?.name,
+        }),
+      });
+
+      if (response.ok) {
+        // Rediriger vers le dashboard
+        router.push('/dashboard');
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Erreur lors de la sauvegarde');
+      }
     } catch (error) {
-      // Erreur déjà gérée par le contexte
+      console.error('Erreur:', error);
+      alert('Erreur lors de la sauvegarde du profil');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadUserBooks = async () => {
-    if (userBooks.length > 0) {
-      setUserBooks([]);
-      return;
-    }
-    setLoadingBooks(true);
-    try {
-      const res: any = await booksApi.getAll({ uploadedBy: user.id });
-      setUserBooks(res.data.books || []);
-    } catch (error) {
-      toast.error('Erreur lors du chargement');
-    } finally {
-      setLoadingBooks(false);
-    }
-  };
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-        {/* En-tête */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-8 text-white">
-          <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-3xl font-bold">
-              {user.name.charAt(0).toUpperCase()}
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800">Complétez votre profil</h1>
+          <p className="text-gray-500 text-sm">Bienvenue {session?.user?.name || 'sur Massaguet'}</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                placeholder="Votre prénom"
+                required
+              />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">{user.name}</h1>
-              <p className="text-white/80">{user.email}</p>
-              <p className="text-white/60 text-sm mt-1">
-                Rôle: {user.role} • Membre depuis{' '}
-                {new Date(user.createdAt).toLocaleDateString('fr-FR')}
-              </p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                placeholder="Votre nom"
+                required
+              />
             </div>
           </div>
-        </div>
 
-        {/* Contenu */}
-        <div className="p-8">
-          {isEditing ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-                <textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  rows={3}
-                  placeholder="Parlez-nous de vous..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-vertical"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleSave}
-                  disabled={loading}
-                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                >
-                  {loading ? 'Sauvegarde...' : 'Sauvegarder'}
-                </button>
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                  Annuler
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-800">Mon profil</h2>
-                  {user.bio && <p className="text-gray-600 mt-2">{user.bio}</p>}
-                </div>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="text-indigo-600 hover:text-indigo-800 flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  Modifier
-                </button>
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sexe</label>
+            <select
+              name="gender"
+              value={formData.gender}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
+            >
+              <option value="">Sélectionnez...</option>
+              <option value="M">Homme</option>
+              <option value="F">Femme</option>
+              <option value="A">Autre</option>
+            </select>
+          </div>
 
-              <div className="grid grid-cols-2 gap-4 text-sm mt-6">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-500">Documents partagés</p>
-                  <p className="text-2xl font-bold text-gray-800">{user.documentsCount || 0}</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-500">Rôle</p>
-                  <p className="text-2xl font-bold text-gray-800 capitalize">{user.role.toLowerCase()}</p>
-                </div>
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ville</label>
+            <input
+              type="text"
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+              placeholder="Votre ville"
+            />
+          </div>
 
-              {/* Mes documents */}
-              <div className="mt-8">
-                <button
-                  onClick={loadUserBooks}
-                  className="text-indigo-600 hover:text-indigo-800 flex items-center gap-2 font-medium"
-                >
-                  {loadingBooks ? (
-                    <svg className="animate-spin w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  )}
-                  {userBooks.length > 0 ? 'Masquer mes documents' : 'Voir mes documents'}
-                </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date de naissance</label>
+            <input
+              type="date"
+              name="birthDate"
+              value={formData.birthDate}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+            />
+          </div>
 
-                {userBooks.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {userBooks.map((book) => (
-                      <div key={book.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-gray-800">{book.title}</p>
-                          <p className="text-sm text-gray-500">par {book.author}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-gray-400">⬇️ {book.downloads}</span>
-                          <Link href={`/books/${book.id}`} className="text-indigo-600 hover:text-indigo-800">
-                            Voir
-                          </Link>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Déconnexion */}
-              <button
-                onClick={logout}
-                className="mt-8 text-red-600 hover:text-red-700 flex items-center gap-2 text-sm"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin inline w-5 h-5 mr-2" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Se déconnecter
-              </button>
-            </div>
-          )}
-        </div>
+                Enregistrement...
+              </>
+            ) : (
+              'Continuer vers le dashboard'
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="w-full text-gray-500 text-sm hover:text-gray-700 transition-colors"
+          >
+            Passer pour l'instant
+          </button>
+        </form>
       </div>
     </div>
   );
