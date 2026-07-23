@@ -45,13 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (session?.user) {
+      // Utiliser une assertion de type pour les propriétés supplémentaires
+      const sessionUser = session.user as any;
       setUser({
-        id: session.user.id || '',
-        name: session.user.name || '',
-        email: session.user.email || '',
-        image: session.user.image || '',
-        role: (session.user as any)?.role || 'USER',
-        provider: (session.user as any)?.provider || 'google',
+        id: sessionUser.id || sessionUser.sub || '',
+        name: sessionUser.name || '',
+        email: sessionUser.email || '',
+        image: sessionUser.image || '',
+        role: sessionUser.role || 'USER',
+        provider: sessionUser.provider || 'google',
         isAuthenticated: true,
       });
     } else {
