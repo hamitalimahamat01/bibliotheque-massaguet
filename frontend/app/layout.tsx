@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Bibliothèque Massaguet - Partage de connaissances',
-  description: 'Bibliothèque en ligne créée par les étudiants de Massaguet pour partager des documents pédagogiques',
+  description: 'Bibliothèque en ligne créée par les étudiants de Massaguet',
   keywords: 'bibliothèque, Massaguet, éducation, partage, documents, BEF, BAC',
 };
 
