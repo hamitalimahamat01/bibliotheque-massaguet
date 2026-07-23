@@ -17,6 +17,42 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          throw new Error('No refresh token');
+        }
+        
+        const response = await api.post('/auth/refresh', { refreshToken });
+        const { accessToken, refreshToken: newRefreshToken } = response.data;
+        
+        localStorage.setItem('token', accessToken);
+        if (newRefreshToken) {
+          localStorage.setItem('refreshToken', newRefreshToken);
+        }
+        
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 // API Auth
 export const authApi = {
   register: (data: { name: string; email: string; password: string }) =>
@@ -40,32 +76,14 @@ export const booksApi = {
   update: (id: string, data: any) => api.put(`/books/${id}`, data),
   delete: (id: string) => api.delete(`/books/${id}`),
   download: (id: string) => api.get(`/books/${id}/download`),
+  toggleFavorite: (id: string) => api.post(`/books/${id}/favorite`),
+  addReview: (id: string, data: { rating: number; comment?: string }) =>
+    api.post(`/books/${id}/review`, data),
 };
 
-// API Categories - avec fallback statique
+// API Categories
 export const categoriesApi = {
-  getAll: async () => {
-    try {
-      const response = await api.get('/categories');
-      return response;
-    } catch (error) {
-      // Fallback statique en cas d'erreur
-      console.warn('Utilisation des catégories statiques');
-      return {
-        data: {
-          success: true,
-          categories: [
-            { id: '1', name: 'Mathématiques' },
-            { id: '2', name: 'Physique' },
-            { id: '3', name: 'Chimie' },
-            { id: '4', name: 'Anglais' },
-            { id: '5', name: 'Philosophie' },
-            { id: '6', name: 'Histoire' }
-          ]
-        }
-      };
-    }
-  },
+  getAll: () => api.get('/categories'),
   create: (data: any) => api.post('/categories', data),
 };
 
@@ -73,6 +91,7 @@ export const categoriesApi = {
 export const usersApi = {
   getAll: () => api.get('/users'),
   getById: (id: string) => api.get(`/users/${id}`),
+  toggleActive: (id: string) => api.patch(`/users/${id}/toggle`),
 };
 
 // API Stats
@@ -81,4 +100,3 @@ export const statsApi = {
 };
 
 export default api;
-  toggleFavorite: (id: string) => api.post(`/books/${id}/favorite`),
