@@ -28,7 +28,7 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-// Configuration Multer pour l'upload de fichiers
+// Configuration Multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = './uploads';
@@ -44,8 +44,8 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
-  const allowedExts = ['.pdf', '.docx', '.ppt', '.pptx'];
+  const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'image/jpeg', 'image/png', 'image/webp'];
+  const allowedExts = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
   const ext = path.extname(file.originalname).toLowerCase();
   
   if (allowedTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
@@ -192,17 +192,24 @@ app.put('/api/auth/profile', auth, async (req, res) => {
 
 // ===== DOCUMENTS ROUTES =====
 
-// Upload d'un document
-app.post('/api/books', auth, upload.single('file'), async (req, res) => {
+// Upload d'un document (avec couverture)
+app.post('/api/books', auth, upload.fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'cover', maxCount: 1 }
+]), async (req, res) => {
   try {
-    if (!req.file) {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const file = files.file?.[0];
+    const cover = files.cover?.[0];
+
+    if (!file) {
       return res.status(400).json({ error: 'Aucun fichier téléchargé' });
     }
 
     const { title, description, author, category, subCategory, subject, year } = req.body;
 
     // Déterminer le type de fichier
-    const ext = path.extname(req.file.originalname).toLowerCase();
+    const ext = path.extname(file.originalname).toLowerCase();
     const fileTypeMap = {
       '.pdf': 'pdf',
       '.docx': 'docx',
@@ -211,18 +218,24 @@ app.post('/api/books', auth, upload.single('file'), async (req, res) => {
     };
     const fileType = fileTypeMap[ext] || 'pdf';
 
+    // URL de la couverture
+    const coverUrl = cover ? `/uploads/${cover.filename}` : null;
+    const coverKey = cover ? cover.filename : null;
+
     // Créer le document dans la base de données
     const result = await pool.query(
       `INSERT INTO books 
        (title, description, author, category, sub_category, subject, 
-        file_type, file_url, file_key, file_name, file_size, uploaded_by, uploaded_by_name, year)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-       RETURNING id, title, author, file_url`,
+        file_type, file_url, file_key, file_name, file_size, 
+        cover_url, cover_key, uploaded_by, uploaded_by_name, year)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+       RETURNING id, title, author, file_url, cover_url`,
       [
         title, description || '', author, category || 'general', 
         subCategory || '', subject || '',
-        fileType, `/uploads/${req.file.filename}`, req.file.filename,
-        req.file.originalname, req.file.size, req.user.id, req.user.name || 'Anonyme', year || ''
+        fileType, `/uploads/${file.filename}`, file.filename,
+        file.originalname, file.size,
+        coverUrl, coverKey, req.user.id, req.user.name || 'Anonyme', year || ''
       ]
     );
 
@@ -233,9 +246,14 @@ app.post('/api/books', auth, upload.single('file'), async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Erreur upload:', error);
-    // Supprimer le fichier en cas d'erreur
-    if (req.file && req.file.path) {
-      fs.unlinkSync(req.file.path);
+    // Supprimer les fichiers en cas d'erreur
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    if (files) {
+      Object.values(files).flat().forEach(f => {
+        if (f.path && fs.existsSync(f.path)) {
+          fs.unlinkSync(f.path);
+        }
+      });
     }
     res.status(500).json({ error: 'Erreur lors du téléchargement' });
   }

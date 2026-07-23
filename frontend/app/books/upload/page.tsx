@@ -13,6 +13,8 @@ export default function UploadBookPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -23,7 +25,8 @@ export default function UploadBookPage() {
     year: '',
   });
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  // Dropzone pour le fichier
+  const { getRootProps: getFileRootProps, getInputProps: getFileInputProps, isDragActive: isFileDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
@@ -48,8 +51,37 @@ export default function UploadBookPage() {
     },
   });
 
+  // Dropzone pour la couverture
+  const { getRootProps: getCoverRootProps, getInputProps: getCoverInputProps, isDragActive: isCoverDragActive } = useDropzone({
+    accept: {
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/webp': ['.webp'],
+    },
+    maxSize: 5 * 1024 * 1024,
+    maxFiles: 1,
+    onDrop: (acceptedFiles) => {
+      if (acceptedFiles.length > 0) {
+        const file = acceptedFiles[0];
+        setCover(file);
+        // Créer une prévisualisation
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setCoverPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+        toast.success(`Couverture ajoutée: ${file.name}`);
+      }
+    },
+  });
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleRemoveCover = () => {
+    setCover(null);
+    setCoverPreview(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,6 +107,7 @@ export default function UploadBookPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      if (cover) formData.append('cover', cover);
       formData.append('title', form.title);
       formData.append('description', form.description);
       formData.append('author', form.author);
@@ -83,7 +116,6 @@ export default function UploadBookPage() {
       formData.append('subject', form.subject);
       formData.append('year', form.year);
 
-      // Récupérer le token
       const token = localStorage.getItem('token');
       
       const response = await fetch('/api/books', {
@@ -150,6 +182,7 @@ export default function UploadBookPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Titre */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Titre du document <span className="text-red-500">*</span>
@@ -165,6 +198,7 @@ export default function UploadBookPage() {
             />
           </div>
 
+          {/* Auteur */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Auteur <span className="text-red-500">*</span>
@@ -180,6 +214,7 @@ export default function UploadBookPage() {
             />
           </div>
 
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
@@ -192,6 +227,7 @@ export default function UploadBookPage() {
             />
           </div>
 
+          {/* Catégorie */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
@@ -220,6 +256,7 @@ export default function UploadBookPage() {
             </div>
           </div>
 
+          {/* Matière et année */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Matière</label>
@@ -245,21 +282,22 @@ export default function UploadBookPage() {
             </div>
           </div>
 
+          {/* Fichier */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fichier <span className="text-red-500">*</span>
             </label>
             <div
-              {...getRootProps()}
+              {...getFileRootProps()}
               className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                isDragActive 
+                isFileDragActive 
                   ? 'border-indigo-500 bg-indigo-50' 
                   : file 
                     ? 'border-green-400 bg-green-50' 
                     : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
               }`}
             >
-              <input {...getInputProps()} />
+              <input {...getFileInputProps()} />
               {file ? (
                 <div className="flex items-center justify-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
@@ -283,7 +321,7 @@ export default function UploadBookPage() {
                     <Icons.Upload className="w-8 h-8 text-gray-400" />
                   </div>
                   <p className="text-gray-600">
-                    {isDragActive ? 'Déposez le fichier ici' : 'Glissez-déposez votre fichier ici ou'}
+                    {isFileDragActive ? 'Déposez le fichier ici' : 'Glissez-déposez votre fichier ici ou'}
                   </p>
                   <p className="text-indigo-600 font-medium">Parcourir</p>
                   <p className="text-xs text-gray-400 mt-2">PDF, DOCX, PPT (max 50 MB)</p>
@@ -292,6 +330,52 @@ export default function UploadBookPage() {
             </div>
           </div>
 
+          {/* Couverture */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Photo de couverture</label>
+            <div
+              {...getCoverRootProps()}
+              className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                isCoverDragActive 
+                  ? 'border-indigo-500 bg-indigo-50' 
+                  : cover 
+                    ? 'border-green-400 bg-green-50' 
+                    : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+              }`}
+            >
+              <input {...getCoverInputProps()} />
+              
+              {coverPreview ? (
+                <div className="relative">
+                  <img
+                    src={coverPreview}
+                    alt="Aperçu de la couverture"
+                    className="max-h-40 mx-auto rounded-lg object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleRemoveCover(); }}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                  >
+                    <Icons.Close className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                    <Icons.Image className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 text-sm">
+                    {isCoverDragActive ? 'Déposez l\'image ici' : 'Glissez-déposez une image ou'}
+                  </p>
+                  <p className="text-indigo-600 font-medium text-sm">Parcourir</p>
+                  <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP (max 5 MB)</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Bouton de soumission */}
           <button
             type="submit"
             disabled={loading || !file}
