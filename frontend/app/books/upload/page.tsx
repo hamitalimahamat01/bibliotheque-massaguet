@@ -25,7 +25,6 @@ export default function UploadBookPage() {
     year: '',
   });
 
-  // Dropzone pour le fichier
   const { getRootProps: getFileRootProps, getInputProps: getFileInputProps, isDragActive: isFileDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
@@ -51,7 +50,6 @@ export default function UploadBookPage() {
     },
   });
 
-  // Dropzone pour la couverture
   const { getRootProps: getCoverRootProps, getInputProps: getCoverInputProps, isDragActive: isCoverDragActive } = useDropzone({
     accept: {
       'image/jpeg': ['.jpg', '.jpeg'],
@@ -64,7 +62,6 @@ export default function UploadBookPage() {
       if (acceptedFiles.length > 0) {
         const file = acceptedFiles[0];
         setCover(file);
-        // Créer une prévisualisation
         const reader = new FileReader();
         reader.onloadend = () => {
           setCoverPreview(reader.result as string);
@@ -126,6 +123,14 @@ export default function UploadBookPage() {
         body: formData,
       });
 
+      // Vérifier si la réponse est du JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Réponse non-JSON:', text);
+        throw new Error('Le serveur a renvoyé une réponse invalide');
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -137,7 +142,7 @@ export default function UploadBookPage() {
       router.push('/books');
     } catch (error: any) {
       console.error('Erreur:', error);
-      toast.error(error.message || 'Erreur lors du partage');
+      toast.error(error.message || 'Erreur lors du partage. Veuillez réessayer.');
     } finally {
       setLoading(false);
     }
@@ -182,7 +187,6 @@ export default function UploadBookPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Titre */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Titre du document <span className="text-red-500">*</span>
@@ -198,7 +202,6 @@ export default function UploadBookPage() {
             />
           </div>
 
-          {/* Auteur */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Auteur <span className="text-red-500">*</span>
@@ -214,7 +217,6 @@ export default function UploadBookPage() {
             />
           </div>
 
-          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
@@ -227,7 +229,6 @@ export default function UploadBookPage() {
             />
           </div>
 
-          {/* Catégorie */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
@@ -256,7 +257,6 @@ export default function UploadBookPage() {
             </div>
           </div>
 
-          {/* Matière et année */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Matière</label>
@@ -282,7 +282,6 @@ export default function UploadBookPage() {
             </div>
           </div>
 
-          {/* Fichier */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fichier <span className="text-red-500">*</span>
@@ -330,7 +329,6 @@ export default function UploadBookPage() {
             </div>
           </div>
 
-          {/* Couverture */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Photo de couverture</label>
             <div
@@ -375,7 +373,6 @@ export default function UploadBookPage() {
             </div>
           </div>
 
-          {/* Bouton de soumission */}
           <button
             type="submit"
             disabled={loading || !file}
