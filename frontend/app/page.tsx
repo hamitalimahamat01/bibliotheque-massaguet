@@ -6,6 +6,14 @@ import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { Icons } from '@/components/Icons';
 
+// Images du carrousel
+const carouselImages = [
+  { src: '/hero/books.svg', alt: 'Bibliothèque', label: 'Bibliothèque numérique' },
+  { src: '/hero/students.svg', alt: 'Étudiants', label: 'Étudiants de Massaguet' },
+  { src: '/hero/knowledge.svg', alt: 'Connaissance', label: 'Partage de connaissances' },
+  { src: '/hero/community.svg', alt: 'Communauté', label: 'Communauté éducative' },
+];
+
 // Citations
 const citations = [
   {
@@ -45,7 +53,9 @@ const categories = [
 export default function HomePage() {
   const { user } = useAuth();
   const [citationIndex, setCitationIndex] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+  // Rotation des citations
   useEffect(() => {
     const interval = setInterval(() => {
       setCitationIndex((prev) => (prev + 1) % citations.length);
@@ -53,44 +63,97 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Rotation des images du carrousel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % carouselImages.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const citation = citations[citationIndex];
+  const currentImage = carouselImages[currentImageIndex];
 
   return (
     <div className="animate-fade-in">
-      {/* === HERO SECTION === */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 px-8 py-16 md:px-12 md:py-20 text-white mb-12">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full translate-x-1/3 translate-y-1/3"></div>
+      {/* === HERO SECTION AVEC CARROUSEL === */}
+      <section className="relative overflow-hidden rounded-3xl mb-12 min-h-[500px] flex items-center">
+        {/* Image de fond avec carrousel */}
+        <div className="absolute inset-0 z-0 transition-all duration-1000 ease-in-out">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/60 via-purple-600/50 to-blue-600/60 z-10"></div>
+          <Image
+            src={currentImage.src}
+            alt={currentImage.alt}
+            fill
+            className="object-cover transition-transform duration-1000 hover:scale-105"
+            priority
+          />
         </div>
-        <div className="relative z-10 max-w-3xl">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium mb-4">
-            <Icons.Book className="w-4 h-4" />
-            Plateforme éducative collaborative
-          </span>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-4">
-            La connaissance<br />
-            <span className="text-yellow-300">à portée de clic</span>
-          </h1>
-          <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl">
-            Bibliothèque numérique créée par l'Union des étudiants de Massaguet.
-            Partagez, explorez et apprenez ensemble.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <Link
-              href="/books"
-              className="bg-white text-indigo-600 px-8 py-3.5 rounded-xl font-bold shadow-lg hover:shadow-2xl transition-all hover:scale-105 flex items-center gap-2"
-            >
-              <Icons.Book className="w-5 h-5" />
-              Explorer la bibliothèque
-            </Link>
-            <Link
-              href="/login"
-              className="bg-white/10 backdrop-blur-sm border border-white/30 text-white px-8 py-3.5 rounded-xl font-medium hover:bg-white/20 transition-all flex items-center gap-2"
-            >
-              <Icons.Login className="w-5 h-5" />
-              Se connecter
-            </Link>
+
+        {/* Indicateurs du carrousel */}
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 flex gap-2">
+          {carouselImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentImageIndex(index)}
+              className={`w-2 h-2 rounded-full transition-all ${
+                index === currentImageIndex 
+                  ? 'bg-white w-8' 
+                  : 'bg-white/50 hover:bg-white/80'
+              }`}
+              aria-label={`Image ${index + 1}`}
+            />
+          ))}
+        </div>
+
+        <div className="relative z-10 container mx-auto px-4 md:px-8 py-12 md:py-20">
+          <div className="max-w-3xl">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium text-white mb-4">
+              <Icons.Book className="w-4 h-4" />
+              Plateforme éducative collaborative
+            </span>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-4 text-white">
+              La connaissance<br />
+              <span className="text-yellow-300">à portée de clic</span>
+            </h1>
+            <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl">
+              Bibliothèque numérique créée par l'Union des étudiants de Massaguet.
+              Partagez, explorez et apprenez ensemble.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <Link
+                href="/books"
+                className="bg-white text-indigo-600 px-8 py-3.5 rounded-xl font-bold shadow-lg hover:shadow-2xl transition-all hover:scale-105 flex items-center gap-2"
+              >
+                <Icons.Book className="w-5 h-5" />
+                Explorer la bibliothèque
+              </Link>
+              <Link
+                href="/login"
+                className="bg-white/10 backdrop-blur-sm border border-white/30 text-white px-8 py-3.5 rounded-xl font-medium hover:bg-white/20 transition-all flex items-center gap-2"
+              >
+                <Icons.Login className="w-5 h-5" />
+                Se connecter
+              </Link>
+            </div>
+            {!user && (
+              <div className="flex flex-wrap gap-3 mt-6">
+                <Link
+                  href="/login"
+                  className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-white/30 transition-all flex items-center gap-2 text-sm"
+                >
+                  <Icons.Login className="w-4 h-4" />
+                  Connexion
+                </Link>
+                <Link
+                  href="/register"
+                  className="bg-white text-indigo-600 px-6 py-2.5 rounded-xl font-medium hover:bg-gray-100 transition-all flex items-center gap-2 text-sm"
+                >
+                  <Icons.Register className="w-4 h-4" />
+                  Inscription
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -189,7 +252,7 @@ export default function HomePage() {
               <div className="flex-shrink-0">
                 <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
                   <Image
-                    src="/team/monprofil.svg"
+                    src="/team/ali.svg"
                     alt="Ali Mahamat"
                     width={96}
                     height={96}
@@ -246,7 +309,6 @@ export default function HomePage() {
 
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100">
               <div className="flex flex-col md:flex-row items-center gap-6">
-                {/* Logo de l'Union */}
                 <div className="flex-shrink-0">
                   <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-white flex items-center justify-center">
                     <Image
