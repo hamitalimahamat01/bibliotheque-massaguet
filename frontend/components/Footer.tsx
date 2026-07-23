@@ -20,10 +20,10 @@ export default function Footer() {
               Plateforme éducative créée par les étudiants de Massaguet.
               Partagez, explorez et apprenez ensemble.
             </p>
-            <div className="mt-4 flex gap-3 text-2xl">
-              <Icons.Book className="w-8 h-8 text-gray-500" />
-              <Icons.Team className="w-8 h-8 text-gray-500" />
-              <Icons.Star className="w-8 h-8 text-gray-500" />
+            <div className="mt-4 flex gap-3">
+              <Icons.Book className="w-6 h-6 text-gray-500" />
+              <Icons.Team className="w-6 h-6 text-gray-500" />
+              <Icons.Star className="w-6 h-6 text-gray-500" />
             </div>
           </div>
 
@@ -31,52 +31,19 @@ export default function Footer() {
           <div>
             <h4 className="text-white font-semibold mb-4">Navigation</h4>
             <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/" className="hover:text-indigo-400 transition-colors flex items-center gap-2">
-                  <Icons.Home className="w-4 h-4" />
-                  Accueil
-                </Link>
-              </li>
-              <li>
-                <Link href="/books" className="hover:text-indigo-400 transition-colors flex items-center gap-2">
-                  <Icons.Book className="w-4 h-4" />
-                  Bibliothèque
-                </Link>
-              </li>
-              <li>
-                <Link href="/dashboard" className="hover:text-indigo-400 transition-colors flex items-center gap-2">
-                  <Icons.Dashboard className="w-4 h-4" />
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link href="/books/upload" className="hover:text-indigo-400 transition-colors flex items-center gap-2">
-                  <Icons.Upload className="w-4 h-4" />
-                  Partager
-                </Link>
-              </li>
+              <li><Link href="/" className="hover:text-indigo-400 transition-colors">Accueil</Link></li>
+              <li><Link href="/books" className="hover:text-indigo-400 transition-colors">Bibliothèque</Link></li>
+              <li><Link href="/dashboard" className="hover:text-indigo-400 transition-colors">Dashboard</Link></li>
+              <li><Link href="/books/upload" className="hover:text-indigo-400 transition-colors">Partager</Link></li>
             </ul>
           </div>
 
-          {/* Pour les étudiants */}
+          {/* Légal */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Pour les étudiants</h4>
+            <h4 className="text-white font-semibold mb-4">Légal</h4>
             <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/books?category=prepa" className="hover:text-indigo-400 transition-colors">
-                  Prépa BEF
-                </Link>
-              </li>
-              <li>
-                <Link href="/books?category=prepa" className="hover:text-indigo-400 transition-colors">
-                  Prépa BAC
-                </Link>
-              </li>
-              <li>
-                <Link href="/books" className="hover:text-indigo-400 transition-colors">
-                  Tous les documents
-                </Link>
-              </li>
+              <li><Link href="/privacy" className="hover:text-indigo-400 transition-colors">Politique de confidentialité</Link></li>
+              <li><Link href="/terms" className="hover:text-indigo-400 transition-colors">Conditions d'utilisation</Link></li>
             </ul>
           </div>
 
@@ -87,13 +54,6 @@ export default function Footer() {
               <li className="text-gray-400 flex items-center gap-2">
                 <Icons.Email className="w-4 h-4" />
                 massaguet@bibliotheque.com
-              </li>
-              <li className="text-gray-400 flex items-center gap-2">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-                Massaguet, Tchad
               </li>
               <li className="text-gray-400 flex items-center gap-2">
                 <Icons.Team className="w-4 h-4" />
