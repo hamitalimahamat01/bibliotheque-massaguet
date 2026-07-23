@@ -1,31 +1,32 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { Icons } from '@/components/Icons';
+import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
-  const { data: session, status } = useSession();
-  const { user } = useAuth();
+  const { user, updateProfile, logout } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [skipping, setSkipping] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     gender: '',
     city: '',
     birthDate: '',
+    bio: '',
   });
 
   useEffect(() => {
-    // Si l'utilisateur n'est pas connecté, rediriger vers login
-    if (status === 'unauthenticated') {
+    if (!user) {
       router.push('/login');
     }
-  }, [status, router]);
+  }, [user, router]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -34,35 +35,34 @@ export default function ProfilePage() {
     setLoading(true);
 
     try {
-      // Sauvegarder les informations dans la base de données
-      const response = await fetch('/api/user/profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          email: session?.user?.email,
-          name: session?.user?.name,
-        }),
-      });
-
-      if (response.ok) {
-        // Rediriger vers le dashboard
-        router.push('/dashboard');
-      } else {
-        const error = await response.json();
-        alert(error.message || 'Erreur lors de la sauvegarde');
-      }
+      await updateProfile(formData);
+      toast.success('Profil complété avec succès !');
+      router.push('/');
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de la sauvegarde du profil');
+      toast.error('Erreur lors de la sauvegarde du profil');
     } finally {
       setLoading(false);
     }
   };
 
-  if (status === 'loading') {
+  const handleSkip = async () => {
+    setSkipping(true);
+    try {
+      router.push('/');
+    } catch (error) {
+      console.error('Erreur:', error);
+    } finally {
+      setSkipping(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
+
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -75,12 +75,15 @@ export default function ProfilePage() {
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+            <Icons.User className="w-8 h-8 text-indigo-600" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Complétez votre profil</h1>
-          <p className="text-gray-500 text-sm">Bienvenue {session?.user?.name || 'sur Massaguet'}</p>
+          <p className="text-gray-500 text-sm">
+            Bienvenue {user.name || 'sur Massaguet'} ! 
+            <span className="block text-xs text-gray-400 mt-1">
+              Ces informations nous aideront à mieux vous connaître
+            </span>
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,7 +97,6 @@ export default function ProfilePage() {
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 placeholder="Votre prénom"
-                required
               />
             </div>
             <div>
@@ -106,7 +108,6 @@ export default function ProfilePage() {
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 placeholder="Votre nom"
-                required
               />
             </div>
           </div>
@@ -149,32 +150,56 @@ export default function ProfilePage() {
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin inline w-5 h-5 mr-2" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Enregistrement...
-              </>
-            ) : (
-              'Continuer vers le dashboard'
-            )}
-          </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Bio (optionnel)</label>
+            <textarea
+              name="bio"
+              value={formData.bio}
+              onChange={handleChange}
+              rows={3}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-vertical"
+              placeholder="Parlez-nous de vous..."
+            />
+          </div>
 
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard')}
-            className="w-full text-gray-500 text-sm hover:text-gray-700 transition-colors"
-          >
-            Passer pour l'instant
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin inline w-5 h-5 mr-2" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Enregistrement...
+                </>
+              ) : (
+                'Enregistrer mon profil'
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleSkip}
+              disabled={skipping}
+              className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {skipping ? 'Redirection...' : 'Passer pour l\'instant'}
+            </button>
+          </div>
         </form>
+
+        <div className="mt-6 text-center border-t border-gray-100 pt-4">
+          <button
+            onClick={handleLogout}
+            className="text-sm text-red-500 hover:text-red-700 transition-colors flex items-center justify-center gap-2 mx-auto"
+          >
+            <Icons.Logout className="w-4 h-4" />
+            Se déconnecter
+          </button>
+        </div>
       </div>
     </div>
   );

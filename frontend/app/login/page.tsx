@@ -1,22 +1,68 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signIn, useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signIn, useSession } from 'next-auth/react';
 import { Icons } from '@/components/Icons';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const { data: session, status } = useSession();
+  const [showPassword, setShowPassword] = useState(false);
+  const { login, user } = useAuth();
+  const { data: session } = useSession();
   const router = useRouter();
 
   useEffect(() => {
-    if (status === 'authenticated') {
+    if (user || session?.user) {
       router.push('/profile');
     }
-  }, [status, router]);
+  }, [user, session, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email || !password) {
+      toast.error('Veuillez remplir tous les champs');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Tentative de connexion avec le backend
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Email ou mot de passe incorrect');
+        return;
+      }
+
+      // Stocker le token
+      localStorage.setItem('token', data.token);
+      
+      // Mettre à jour le contexte
+      await login(email, password);
+      
+      toast.success('Connexion réussie !');
+      router.push('/profile');
+    } catch (error) {
+      console.error('Erreur de connexion:', error);
+      toast.error('Erreur lors de la connexion');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
@@ -50,6 +96,7 @@ export default function LoginPage() {
         </div>
 
         <div className="auth-card rounded-3xl p-8 shine">
+          {/* Bouton Google */}
           <button
             onClick={handleGoogleLogin}
             disabled={googleLoading}
@@ -76,12 +123,109 @@ export default function LoginPage() {
             )}
           </button>
 
+          <div className="auth-divider my-6">
+            <span className="text-xs text-gray-400 font-medium tracking-wider uppercase px-2 bg-transparent">
+              ou
+            </span>
+          </div>
+
+          {/* Formulaire Email/Password */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">
+                Adresse email
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Icons.Email className="w-4 h-4 text-gray-300" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3.5 auth-input rounded-2xl text-sm text-gray-800 placeholder:text-gray-300 focus:outline-none"
+                  placeholder="exemple@email.com"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">
+                Mot de passe
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0110 0v4" />
+                  </svg>
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-11 pr-12 py-3.5 auth-input rounded-2xl text-sm text-gray-800 placeholder:text-gray-300 focus:outline-none"
+                  placeholder="••••••••"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-300 hover:text-gray-500 transition-colors"
+                >
+                  {showPassword ? (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 auth-btn-primary rounded-2xl font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Connexion...
+                </>
+              ) : (
+                'Se connecter'
+              )}
+            </button>
+          </form>
+
           <div className="mt-6 text-center">
-            <p className="text-xs text-gray-400">
-              Bibliothèque Massaguet • Accès sécurisé
+            <p className="text-sm text-gray-400">
+              Pas encore de compte ?{' '}
+              <Link
+                href="/register"
+                className="text-gray-600 font-medium hover:text-gray-800 transition-colors"
+              >
+                Créer un compte
+              </Link>
             </p>
           </div>
         </div>
+
+        <p className="text-center text-xs text-gray-400/60 mt-8 tracking-wide">
+          Bibliothèque Massaguet • Accès sécurisé
+        </p>
       </div>
     </div>
   );

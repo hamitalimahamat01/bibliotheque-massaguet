@@ -12,20 +12,12 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 console.log('🚀 Démarrage du serveur...');
-console.log('📌 PORT:', PORT);
-console.log('📌 DATABASE_URL:', process.env.DATABASE_URL ? '✅ Défini' : '❌ Non défini');
 
 // PostgreSQL Connection
-let pool;
-try {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
-  console.log('✅ PostgreSQL configuré');
-} catch (error) {
-  console.error('❌ Erreur configuration PostgreSQL:', error.message);
-}
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 // Middleware
 app.use(cors({
@@ -51,9 +43,6 @@ const auth = (req, res, next) => {
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
-    if (!pool) {
-      throw new Error('Pool non initialisé');
-    }
     await pool.query('SELECT 1');
     res.json({ 
       status: 'OK', 
@@ -61,70 +50,90 @@ app.get('/api/health', async (req, res) => {
       database: '✅ Connecté à Neon'
     });
   } catch (error) {
-    console.error('❌ Erreur health check:', error.message);
     res.status(500).json({ 
       status: 'ERROR', 
-      message: 'Erreur de connexion à la base de données',
-      error: error.message
+      message: 'Erreur de connexion à la base de données'
     });
   }
 });
 
 // ===== AUTH ROUTES =====
+
+// Inscription
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
     
+    // Vérifier si l'utilisateur existe
     const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
-      return res.status(400).json({ error: 'Email déjà utilisé' });
+      return res.status(400).json({ error: 'Cet email est déjà utilisé' });
     }
 
+    // Hasher le mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Créer l'utilisateur
     const result = await pool.query(
-      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email',
-      [name, email, hashedPassword]
+      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
+      [name, email, hashedPassword, 'USER']
     );
 
     const user = result.rows[0];
-    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role }, 
+      process.env.JWT_SECRET || 'secret', 
+      { expiresIn: '7d' }
+    );
 
     res.json({ success: true, token, user });
   } catch (error) {
     console.error('❌ Erreur register:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur lors de l\'inscription' });
   }
 });
 
+// Connexion
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
+    // Récupérer l'utilisateur
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
 
     const user = result.rows[0];
+    
+    // Vérifier le mot de passe
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    // Générer le token
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role }, 
+      process.env.JWT_SECRET || 'secret', 
+      { expiresIn: '7d' }
+    );
+
+    // Retourner l'utilisateur sans le mot de passe
     delete user.password;
 
     res.json({ success: true, token, user });
   } catch (error) {
     console.error('❌ Erreur login:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur lors de la connexion' });
   }
 });
 
+// Profil
 app.get('/api/auth/profile', auth, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, role, bio, documents_count FROM users WHERE id = $1',
+      'SELECT id, name, email, role, bio, avatar, first_name, last_name, gender, city, birth_date FROM users WHERE id = $1',
       [req.user.id]
     );
     if (result.rows.length === 0) {
@@ -137,77 +146,61 @@ app.get('/api/auth/profile', auth, async (req, res) => {
   }
 });
 
-// ===== STATS =====
-app.get('/api/documents/stats', async (req, res) => {
+// Mettre à jour le profil
+app.put('/api/auth/profile', auth, async (req, res) => {
   try {
-    const result = await pool.query('SELECT COUNT(*) as total FROM books');
-    res.json({ success: true, stats: { documents: parseInt(result.rows[0].total) || 0 } });
-  } catch (error) {
-    console.error('❌ Erreur stats:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// ===== BOOKS =====
-app.get('/api/books', async (req, res) => {
-  try {
-    const { category, search, limit = 12, page = 1 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const { first_name, last_name, gender, city, birth_date, bio } = req.body;
     
-    let query = 'SELECT * FROM books WHERE is_published = 1';
-    const params = [];
-    let paramCount = 1;
-
-    if (category) {
-      query += ` AND category = $${paramCount}`;
-      params.push(category);
-      paramCount++;
-    }
-
-    if (search) {
-      query += ` AND (title ILIKE $${paramCount} OR author ILIKE $${paramCount})`;
-      params.push(`%${search}%`);
-      paramCount++;
-    }
-
-    query += ` ORDER BY created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
-    params.push(parseInt(limit), offset);
-
-    const books = await pool.query(query, params);
-    const total = await pool.query('SELECT COUNT(*) as count FROM books WHERE is_published = 1');
-
-    res.json({
-      success: true,
-      books: books.rows,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: parseInt(total.rows[0].count),
-        pages: Math.ceil(parseInt(total.rows[0].count) / parseInt(limit))
-      }
-    });
+    const result = await pool.query(
+      `UPDATE users 
+       SET first_name = $1, last_name = $2, gender = $3, city = $4, birth_date = $5, bio = $6
+       WHERE id = $7 
+       RETURNING id, name, email, role, bio, first_name, last_name, gender, city, birth_date`,
+      [first_name, last_name, gender, city, birth_date, bio, req.user.id]
+    );
+    
+    res.json({ success: true, user: result.rows[0] });
   } catch (error) {
-    console.error('❌ Erreur books:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('❌ Erreur update profile:', error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour' });
   }
 });
 
 // ===== DÉMARRAGE =====
+// Créer les tables si elles n'existent pas
+const initDB = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(20) DEFAULT 'USER',
+        bio TEXT,
+        avatar TEXT,
+        first_name VARCHAR(100),
+        last_name VARCHAR(100),
+        gender VARCHAR(20),
+        city VARCHAR(100),
+        birth_date DATE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('✅ Tables vérifiées/créées');
+  } catch (error) {
+    console.error('❌ Erreur création tables:', error);
+  }
+};
+
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Serveur: http://0.0.0.0:${PORT}`);
-  console.log('📊 Base de données: PostgreSQL (Neon)');
-  console.log('📁 Uploads: ./uploads');
-});
-
-// Gestion des erreurs non capturées
-process.on('uncaughtException', (err) => {
-  console.error('❌ Uncaught Exception:', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection:', reason);
+initDB().then(() => {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Serveur: http://0.0.0.0:${PORT}`);
+    console.log('📊 Base de données: PostgreSQL (Neon)');
+    console.log('📁 Uploads: ./uploads');
+  });
 });
