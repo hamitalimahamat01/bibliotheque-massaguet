@@ -23,7 +23,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (user) {
-      setIsAdmin(user.role === 'ADMIN' || user.role === 'MODERATOR');
+      // Vérifier le rôle de l'utilisateur en utilisant une assertion de type ou une vérification
+      const userRole = (user as any)?.role || 'USER';
+      setIsAdmin(userRole === 'ADMIN' || userRole === 'MODERATOR');
       loadDashboard();
     }
   }, [user]);
