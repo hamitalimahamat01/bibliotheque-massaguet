@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { Icons } from '@/components/Icons';
 
-// Citations avec photos
+// Citations
 const citations = [
   {
     text: "La lecture est à l'esprit ce que l'exercice est au corps.",
@@ -42,38 +42,6 @@ const categories = [
   { title: 'Histoire', color: 'from-amber-500 to-yellow-500' },
 ];
 
-// Équipe de développement
-const teamMembers = [
-  {
-    name: "Ali Mahamat",
-    role: "Développeur Full-Stack",
-    description: "Étudiant passionné de Massaguet, créateur de cette plateforme éducative pour faciliter l'accès à la connaissance.",
-    image: "/team/ali.jpg",
-    github: "https://github.com",
-    linkedin: "https://linkedin.com",
-    email: "ali@massaguet.edu",
-  },
-  {
-    name: "Fatima Hassan",
-    role: "Designer UI/UX",
-    description: "Designer passionnée par l'expérience utilisateur, elle a conçu l'interface élégante et intuitive de la plateforme.",
-    image: "/team/fatima.jpg",
-    github: "https://github.com",
-    linkedin: "https://linkedin.com",
-    email: "fatima@massaguet.edu",
-  },
-];
-
-// Groupe de membres
-const groupMembers = [
-  { name: "Moussa Ali", role: "Contributeur" },
-  { name: "Amina Saleh", role: "Rédactrice" },
-  { name: "Ibrahim Moussa", role: "Relecteur" },
-  { name: "Mariam Abakar", role: "Modératrice" },
-  { name: "Adam Issa", role: "Contributeur" },
-  { name: "Zara Mahamat", role: "Traductrice" },
-];
-
 export default function HomePage() {
   const { user } = useAuth();
   const [citationIndex, setCitationIndex] = useState(0);
@@ -105,7 +73,7 @@ export default function HomePage() {
             <span className="text-yellow-300">à portée de clic</span>
           </h1>
           <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl">
-            Bibliothèque numérique créée par les étudiants de Massaguet.
+            Bibliothèque numérique créée par l'Union des étudiants de Massaguet.
             Partagez, explorez et apprenez ensemble.
           </p>
           <div className="flex flex-wrap gap-4">
@@ -202,109 +170,125 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* === ÉQUIPE DE DÉVELOPPEMENT === */}
+      {/* === DÉVELOPPEUR & UNION === */}
       <section className="mb-12">
         <div className="flex items-center gap-3 mb-6">
           <Icons.Users className="w-7 h-7 text-indigo-600" />
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">Équipe de développement</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">Équipe & contributeurs</h2>
         </div>
         
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-8 border-b border-gray-100">
-            <p className="text-gray-600 leading-relaxed max-w-3xl">
-              Cette plateforme a été développée par des étudiants passionnés de la région de Massaguet,
-              unis par la volonté de partager le savoir et de faciliter l'accès à l'éducation pour tous.
-            </p>
+          {/* Développeur */}
+          <div className="p-8 border-b border-gray-100">
+            <div className="flex items-center gap-2 mb-4">
+              <Icons.Code className="w-5 h-5 text-indigo-600" />
+              <h3 className="text-lg font-bold text-gray-800">Développeur</h3>
+            </div>
+            
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-6 bg-gray-50 rounded-xl p-6">
+              <div className="flex-shrink-0">
+                <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                  <Image
+                    src="/team/monprofil.svg"
+                    alt="Ali Mahamat"
+                    width={96}
+                    height={96}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <h4 className="text-xl font-bold text-gray-800">Ali Mahamat</h4>
+                <p className="text-indigo-600 font-medium">Développeur Full-Stack</p>
+                <p className="text-gray-500 text-sm mt-2 leading-relaxed">
+                  Étudiant passionné de Massaguet, créateur de cette plateforme éducative pour faciliter l'accès à la connaissance.
+                </p>
+                <div className="flex justify-center md:justify-start gap-3 mt-4">
+                  <a
+                    href="https://github.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors text-gray-600 hover:text-gray-900"
+                    aria-label="GitHub"
+                  >
+                    <Icons.Github className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="https://linkedin.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg bg-gray-200 hover:bg-[#0077b5]/10 transition-colors text-gray-600 hover:text-[#0077b5]"
+                    aria-label="LinkedIn"
+                  >
+                    <Icons.LinkedIn className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="mailto:ali@massaguet.edu"
+                    className="p-2 rounded-lg bg-gray-200 hover:bg-red-50 transition-colors text-gray-600 hover:text-red-500"
+                    aria-label="Email"
+                  >
+                    <Icons.Email className="w-5 h-5" />
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
 
+          {/* Union des étudiants de Massaguet */}
           <div className="p-8">
-            {/* Membres principaux */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {teamMembers.map((member, index) => (
-                <div
-                  key={index}
-                  className="bg-gray-50 rounded-xl p-6 text-center hover:shadow-lg transition-all group"
-                >
-                  <div className="w-24 h-24 rounded-full mx-auto mb-4 overflow-hidden bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center ring-4 ring-white shadow-lg">
-                    {member.image ? (
-                      <Image
-                        src={member.image}
-                        alt={member.name}
-                        width={96}
-                        height={96}
-                        className="object-cover w-full h-full"
-                      />
-                    ) : (
-                      <span className="text-3xl font-bold text-indigo-600">
-                        {member.name.charAt(0)}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-bold text-gray-800 text-lg">{member.name}</h3>
-                  <p className="text-indigo-600 text-sm font-medium">{member.role}</p>
-                  <p className="text-gray-500 text-sm mt-2 leading-relaxed">{member.description}</p>
-                  
-                  <div className="flex justify-center gap-3 mt-4">
-                    <a
-                      href={member.github}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors text-gray-600 hover:text-gray-900"
-                      aria-label="GitHub"
-                    >
-                      <Icons.Github className="w-5 h-5" />
-                    </a>
-                    <a
-                      href={member.linkedin}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-lg bg-gray-200 hover:bg-[#0077b5]/10 transition-colors text-gray-600 hover:text-[#0077b5]"
-                      aria-label="LinkedIn"
-                    >
-                      <Icons.LinkedIn className="w-5 h-5" />
-                    </a>
-                    <a
-                      href={`mailto:${member.email}`}
-                      className="p-2 rounded-lg bg-gray-200 hover:bg-red-50 transition-colors text-gray-600 hover:text-red-500"
-                      aria-label="Email"
-                    >
-                      <Icons.Email className="w-5 h-5" />
-                    </a>
+            <div className="flex items-center gap-2 mb-4">
+              <Icons.Users className="w-5 h-5 text-indigo-600" />
+              <h3 className="text-lg font-bold text-gray-800">Contributeurs</h3>
+              <span className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-xs font-medium">
+                Union des étudiants de Massaguet
+              </span>
+            </div>
+
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100">
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                {/* Logo de l'Union */}
+                <div className="flex-shrink-0">
+                  <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-white flex items-center justify-center">
+                    <Image
+                      src="/team/union-logo.svg"
+                      alt="Union des étudiants de Massaguet"
+                      width={96}
+                      height={96}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Groupe de membres */}
-            <div className="border-t border-gray-200 pt-8">
-              <div className="flex items-center gap-2 mb-4">
-                <Icons.Users className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-lg font-semibold text-gray-800">Membres de la communauté</h3>
-                <span className="text-sm text-gray-400">({groupMembers.length} contributeurs)</span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {groupMembers.map((member, index) => (
-                  <div
-                    key={index}
-                    className="bg-gray-50 rounded-lg p-3 text-center hover:bg-indigo-50 transition-colors"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mx-auto mb-2">
-                      <span className="text-sm font-bold text-indigo-600">
-                        {member.name.charAt(0)}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-gray-800">{member.name}</p>
-                    <p className="text-xs text-gray-400">{member.role}</p>
+                
+                <div className="flex-1 text-center md:text-left">
+                  <h4 className="text-xl font-bold text-gray-800">Union des étudiants de Massaguet</h4>
+                  <p className="text-sm text-gray-600 leading-relaxed max-w-2xl">
+                    L'Union des étudiants de Massaguet est une association dédiée à la promotion de l'éducation 
+                    et du partage de connaissances. Ensemble, nous croyons que l'accès à l'information est un droit 
+                    fondamental et que la collaboration est la clé de la réussite éducative.
+                  </p>
+                  <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-4">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-sm text-gray-600 shadow-sm">
+                      <Icons.User className="w-4 h-4 text-indigo-500" />
+                      Étudiants
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-sm text-gray-600 shadow-sm">
+                      <Icons.Book className="w-4 h-4 text-indigo-500" />
+                      Éducation
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-sm text-gray-600 shadow-sm">
+                      <Icons.Star className="w-4 h-4 text-indigo-500" />
+                      Partage
+                    </span>
                   </div>
-                ))}
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 p-4 bg-indigo-50 rounded-xl text-center border border-indigo-100">
+            <div className="mt-4 p-4 bg-indigo-50 rounded-xl text-center border border-indigo-100">
               <p className="text-gray-700 text-sm flex items-center justify-center gap-2">
                 <Icons.Users className="w-5 h-5 text-indigo-600" />
-                <span className="font-medium">Rejoignez la communauté !</span>
-                Contribuez en partageant vos documents et en aidant les autres à apprendre.
+                <span className="font-medium">Rejoignez l'Union des étudiants de Massaguet !</span>
+                Contribuez à notre mission éducative en partageant vos documents.
               </p>
               <Link
                 href="/books/upload"
@@ -343,24 +327,6 @@ export default function HomePage() {
             Partager
           </Link>
         </div>
-        {!user && (
-          <div className="flex flex-wrap justify-center gap-3 mt-6">
-            <Link
-              href="/login"
-              className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-white/30 transition-all flex items-center gap-2 text-sm"
-            >
-              <Icons.Login className="w-4 h-4" />
-              Connexion
-            </Link>
-            <Link
-              href="/register"
-              className="bg-white text-indigo-600 px-6 py-2.5 rounded-xl font-medium hover:bg-gray-100 transition-all flex items-center gap-2 text-sm"
-            >
-              <Icons.Register className="w-4 h-4" />
-              Inscription
-            </Link>
-          </div>
-        )}
       </section>
     </div>
   );
