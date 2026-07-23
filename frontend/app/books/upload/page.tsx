@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { booksApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { Icons } from '@/components/Icons';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -24,7 +25,7 @@ export default function UploadBookPage() {
     year: '',
   });
 
-  const { getRootProps: getFileRootProps, getInputProps: getFileInputProps } = useDropzone({
+  const { getRootProps: getFileRootProps, getInputProps: getFileInputProps, isDragActive: isFileDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
@@ -49,7 +50,7 @@ export default function UploadBookPage() {
     },
   });
 
-  const { getRootProps: getCoverRootProps, getInputProps: getCoverInputProps } = useDropzone({
+  const { getRootProps: getCoverRootProps, getInputProps: getCoverInputProps, isDragActive: isCoverDragActive } = useDropzone({
     accept: {
       'image/jpeg': ['.jpg', '.jpeg'],
       'image/png': ['.png'],
@@ -102,7 +103,7 @@ export default function UploadBookPage() {
       formData.append('year', form.year);
 
       await booksApi.create(formData);
-      toast.success('Livre partagé avec succès !');
+      toast.success('Document partagé avec succès !');
       router.push('/books');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Erreur lors du partage');
@@ -113,202 +114,257 @@ export default function UploadBookPage() {
 
   if (!user) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-600 mb-4">Connexion requise</h2>
-        <p className="text-gray-500 mb-6">Vous devez être connecté pour partager un document</p>
-        <Link href="/login" className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700">
-          Se connecter
-        </Link>
+      <div className="max-w-2xl mx-auto py-12 text-center">
+        <div className="bg-white rounded-2xl shadow-lg p-12">
+          <Icons.User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-600 mb-4">Connexion requise</h2>
+          <p className="text-gray-500 mb-6">Vous devez être connecté pour partager un document</p>
+          <Link href="/login" className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 inline-flex items-center gap-2">
+            <Icons.Login className="w-5 h-5" />
+            Se connecter
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="max-w-3xl mx-auto animate-fade-in">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">Partager un document</h1>
-      <p className="text-gray-500 mb-6">Ajoutez un nouveau document à la bibliothèque</p>
+      <div className="mb-8">
+        <Link href="/books" className="text-gray-500 hover:text-gray-700 flex items-center gap-2 text-sm">
+          <Icons.ArrowLeft className="w-4 h-4" />
+          Retour à la bibliothèque
+        </Link>
+      </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg p-8">
-        {/* Titre */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Titre *</label>
-          <input
-            type="text"
-            name="title"
-            value={form.title}
-            onChange={handleChange}
-            placeholder="Titre du document"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-            required
-          />
-        </div>
-
-        {/* Auteur */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Auteur *</label>
-          <input
-            type="text"
-            name="author"
-            value={form.author}
-            onChange={handleChange}
-            placeholder="Nom de l'auteur"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-            required
-          />
-        </div>
-
-        {/* Description */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <textarea
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            placeholder="Description du document"
-            rows={4}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-vertical"
-          />
-        </div>
-
-        {/* Catégorie */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-            <select
-              name="category"
-              value={form.category}
-              onChange={handleChange}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
-            >
-              <option value="general">Bibliothèque générale</option>
-              <option value="prepa">Prépa BEF/BAC</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sous-catégorie</label>
-            <select
-              name="subCategory"
-              value={form.subCategory}
-              onChange={handleChange}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
-            >
-              <option value="">Aucune</option>
-              <option value="bef">BEF</option>
-              <option value="bac">BAC</option>
-            </select>
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
+              <Icons.Upload className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">Partager un document</h1>
+              <p className="text-gray-500 text-sm">Ajoutez un nouveau document à la bibliothèque</p>
+            </div>
           </div>
         </div>
 
-        {/* Matière et année */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Titre */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Matière</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Titre du document <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
-              name="subject"
-              value={form.subject}
+              name="title"
+              value={form.title}
               onChange={handleChange}
-              placeholder="Ex: Mathématiques"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+              placeholder="Ex: Cours de mathématiques niveau BAC"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+              required
             />
           </div>
+
+          {/* Auteur */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Année</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Auteur <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
-              name="year"
-              value={form.year}
+              name="author"
+              value={form.author}
               onChange={handleChange}
-              placeholder="2024-2025"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+              placeholder="Nom de l'auteur"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+              required
             />
           </div>
-        </div>
 
-        {/* Fichier */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Fichier *</label>
-          <div
-            {...getFileRootProps()}
-            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-              file ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-indigo-400'
-            }`}
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              rows={4}
+              placeholder="Décrivez brièvement le contenu du document..."
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-vertical transition-all"
+            />
+          </div>
+
+          {/* Catégorie */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
+              <select
+                name="category"
+                value={form.category}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white transition-all"
+              >
+                <option value="general">Bibliothèque générale</option>
+                <option value="prepa">Prépa BEF/BAC</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sous-catégorie</label>
+              <select
+                name="subCategory"
+                value={form.subCategory}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white transition-all"
+              >
+                <option value="">Aucune</option>
+                <option value="bef">BEF</option>
+                <option value="bac">BAC</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Matière et année */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Matière</label>
+              <input
+                type="text"
+                name="subject"
+                value={form.subject}
+                onChange={handleChange}
+                placeholder="Ex: Mathématiques"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Année</label>
+              <input
+                type="text"
+                name="year"
+                value={form.year}
+                onChange={handleChange}
+                placeholder="2024-2025"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Fichier */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fichier <span className="text-red-500">*</span>
+            </label>
+            <div
+              {...getFileRootProps()}
+              className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                isFileDragActive 
+                  ? 'border-indigo-500 bg-indigo-50' 
+                  : file 
+                    ? 'border-green-400 bg-green-50' 
+                    : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+              }`}
+            >
+              <input {...getFileInputProps()} />
+              {file ? (
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                    <Icons.Upload className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-gray-800">{file.name}</p>
+                    <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                    className="ml-4 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <Icons.Close className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                    <Icons.Upload className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-600">
+                    {isFileDragActive ? 'Déposez le fichier ici' : 'Glissez-déposez votre fichier ici ou'}
+                  </p>
+                  <p className="text-indigo-600 font-medium">Parcourir</p>
+                  <p className="text-xs text-gray-400 mt-2">PDF, DOCX, PPT (max 50 MB)</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Couverture */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Couverture (optionnel)</label>
+            <div
+              {...getCoverRootProps()}
+              className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                isCoverDragActive 
+                  ? 'border-indigo-500 bg-indigo-50' 
+                  : cover 
+                    ? 'border-green-400 bg-green-50' 
+                    : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+              }`}
+            >
+              <input {...getCoverInputProps()} />
+              {cover ? (
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                    <Icons.Image className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-gray-800">{cover.name}</p>
+                    <p className="text-sm text-gray-500">{(cover.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setCover(null); }}
+                    className="ml-4 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <Icons.Close className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                    <Icons.Image className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 text-sm">Ajouter une image de couverture</p>
+                  <p className="text-xs text-gray-400">JPG, PNG, WEBP (max 5 MB)</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Bouton de soumission */}
+          <button
+            type="submit"
+            disabled={loading || !file}
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3.5 rounded-xl font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <input {...getFileInputProps()} />
-            {file ? (
-              <div>
-                <svg className="w-12 h-12 mx-auto text-green-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            {loading ? (
+              <>
+                <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <p className="font-medium text-gray-800">{file.name}</p>
-                <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-              </div>
+                Publication en cours...
+              </>
             ) : (
               <>
-                <svg className="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <p className="text-gray-600">Glissez-déposez votre fichier ici ou</p>
-                <p className="text-indigo-600 font-medium">Parcourir</p>
-                <p className="text-xs text-gray-400 mt-2">PDF, DOCX, PPT (max 50 MB)</p>
+                <Icons.Upload className="w-5 h-5" />
+                Partager le document
               </>
             )}
-          </div>
-        </div>
-
-        {/* Couverture */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Couverture (optionnel)</label>
-          <div
-            {...getCoverRootProps()}
-            className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-              cover ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-indigo-400'
-            }`}
-          >
-            <input {...getCoverInputProps()} />
-            {cover ? (
-              <div>
-                <svg className="w-8 h-8 mx-auto text-green-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="font-medium text-gray-800">{cover.name}</p>
-                <p className="text-sm text-gray-500">{(cover.size / 1024 / 1024).toFixed(2)} MB</p>
-              </div>
-            ) : (
-              <>
-                <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-gray-600">Ajouter une image de couverture</p>
-                <p className="text-xs text-gray-400">JPG, PNG, WEBP (max 5 MB)</p>
-              </>
-            )}
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading || !file}
-          className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <>
-              <svg className="animate-spin w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Publication en cours...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Partager le document
-            </>
-          )}
-        </button>
-      </form>
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
