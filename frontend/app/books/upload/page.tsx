@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
-import { booksApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { Icons } from '@/components/Icons';
 import toast from 'react-hot-toast';
@@ -14,7 +13,6 @@ export default function UploadBookPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [cover, setCover] = useState<File | null>(null);
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -25,7 +23,7 @@ export default function UploadBookPage() {
     year: '',
   });
 
-  const { getRootProps: getFileRootProps, getInputProps: getFileInputProps, isDragActive: isFileDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
@@ -46,22 +44,6 @@ export default function UploadBookPage() {
         toast.error('Le fichier ne doit pas dépasser 50 MB');
       } else if (error?.code === 'file-invalid-type') {
         toast.error('Format non supporté. Utilisez PDF, DOCX ou PPT');
-      }
-    },
-  });
-
-  const { getRootProps: getCoverRootProps, getInputProps: getCoverInputProps, isDragActive: isCoverDragActive } = useDropzone({
-    accept: {
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png'],
-      'image/webp': ['.webp'],
-    },
-    maxSize: 5 * 1024 * 1024,
-    maxFiles: 1,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles.length > 0) {
-        setCover(acceptedFiles[0]);
-        toast.success(`Couverture ajoutée: ${acceptedFiles[0].name}`);
       }
     },
   });
@@ -93,7 +75,6 @@ export default function UploadBookPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      if (cover) formData.append('cover', cover);
       formData.append('title', form.title);
       formData.append('description', form.description);
       formData.append('author', form.author);
@@ -102,11 +83,29 @@ export default function UploadBookPage() {
       formData.append('subject', form.subject);
       formData.append('year', form.year);
 
-      await booksApi.create(formData);
+      // Récupérer le token
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch('/api/books', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Erreur lors du partage');
+        return;
+      }
+
       toast.success('Document partagé avec succès !');
       router.push('/books');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Erreur lors du partage');
+      console.error('Erreur:', error);
+      toast.error(error.message || 'Erreur lors du partage');
     } finally {
       setLoading(false);
     }
@@ -151,7 +150,6 @@ export default function UploadBookPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Titre */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Titre du document <span className="text-red-500">*</span>
@@ -167,7 +165,6 @@ export default function UploadBookPage() {
             />
           </div>
 
-          {/* Auteur */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Auteur <span className="text-red-500">*</span>
@@ -183,7 +180,6 @@ export default function UploadBookPage() {
             />
           </div>
 
-          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
@@ -196,7 +192,6 @@ export default function UploadBookPage() {
             />
           </div>
 
-          {/* Catégorie */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
@@ -225,7 +220,6 @@ export default function UploadBookPage() {
             </div>
           </div>
 
-          {/* Matière et année */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Matière</label>
@@ -251,22 +245,21 @@ export default function UploadBookPage() {
             </div>
           </div>
 
-          {/* Fichier */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fichier <span className="text-red-500">*</span>
             </label>
             <div
-              {...getFileRootProps()}
+              {...getRootProps()}
               className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                isFileDragActive 
+                isDragActive 
                   ? 'border-indigo-500 bg-indigo-50' 
                   : file 
                     ? 'border-green-400 bg-green-50' 
                     : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
               }`}
             >
-              <input {...getFileInputProps()} />
+              <input {...getInputProps()} />
               {file ? (
                 <div className="flex items-center justify-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
@@ -290,7 +283,7 @@ export default function UploadBookPage() {
                     <Icons.Upload className="w-8 h-8 text-gray-400" />
                   </div>
                   <p className="text-gray-600">
-                    {isFileDragActive ? 'Déposez le fichier ici' : 'Glissez-déposez votre fichier ici ou'}
+                    {isDragActive ? 'Déposez le fichier ici' : 'Glissez-déposez votre fichier ici ou'}
                   </p>
                   <p className="text-indigo-600 font-medium">Parcourir</p>
                   <p className="text-xs text-gray-400 mt-2">PDF, DOCX, PPT (max 50 MB)</p>
@@ -299,50 +292,6 @@ export default function UploadBookPage() {
             </div>
           </div>
 
-          {/* Couverture */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Couverture (optionnel)</label>
-            <div
-              {...getCoverRootProps()}
-              className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
-                isCoverDragActive 
-                  ? 'border-indigo-500 bg-indigo-50' 
-                  : cover 
-                    ? 'border-green-400 bg-green-50' 
-                    : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
-              }`}
-            >
-              <input {...getCoverInputProps()} />
-              {cover ? (
-                <div className="flex items-center justify-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                    <Icons.Image className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-gray-800">{cover.name}</p>
-                    <p className="text-sm text-gray-500">{(cover.size / 1024 / 1024).toFixed(2)} MB</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setCover(null); }}
-                    className="ml-4 text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <Icons.Close className="w-5 h-5" />
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                    <Icons.Image className="w-6 h-6 text-gray-400" />
-                  </div>
-                  <p className="text-gray-500 text-sm">Ajouter une image de couverture</p>
-                  <p className="text-xs text-gray-400">JPG, PNG, WEBP (max 5 MB)</p>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Bouton de soumission */}
           <button
             type="submit"
             disabled={loading || !file}
