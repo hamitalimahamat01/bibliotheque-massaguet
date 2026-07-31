@@ -65,16 +65,14 @@ export default function PrepaMainPage() {
         </Link>
       </div>
 
-      {!user && (
-        <div className="mt-12 text-center bg-gray-50 rounded-2xl p-8">
-          <p className="text-gray-600">
-            <Link href="/login" className="text-indigo-600 hover:underline font-medium">
-              Connectez-vous
-            </Link>{' '}
-            pour partager vos documents
-          </p>
-        </div>
-      )}
+      <div className="mt-12 text-center bg-gray-50 rounded-2xl p-8">
+        <p className="text-gray-600">
+          <Link href="/login" className="text-indigo-600 hover:underline font-medium">
+            Connectez-vous
+          </Link>{' '}
+          pour partager vos documents
+        </p>
+      </div>
     </div>
   );
 }
