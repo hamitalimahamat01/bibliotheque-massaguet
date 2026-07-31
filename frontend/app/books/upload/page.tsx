@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { useAuth } from '@/context/AuthContext';
@@ -8,14 +8,25 @@ import { Icons } from '@/components/Icons';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
+interface FormData {
+  title: string;
+  description: string;
+  author: string;
+  category: string;
+  subCategory: string;
+  subject: string;
+  year: string;
+}
+
 export default function UploadBookPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [file, setFile] = useState<File | null>(null);
   const [cover, setCover] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormData>({
     title: '',
     description: '',
     author: '',
@@ -25,6 +36,20 @@ export default function UploadBookPage() {
     year: '',
   });
 
+  // Dropzone pour le fichier
+  const onFileDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      // Vérifier la taille
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error('Le fichier ne doit pas dépasser 50 MB');
+        return;
+      }
+      setFile(file);
+      toast.success(`Fichier ajouté: ${file.name}`);
+    }
+  }, []);
+
   const { getRootProps: getFileRootProps, getInputProps: getFileInputProps, isDragActive: isFileDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
@@ -32,14 +57,8 @@ export default function UploadBookPage() {
       'application/vnd.ms-powerpoint': ['.ppt'],
       'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
     },
-    maxSize: 50 * 1024 * 1024,
     maxFiles: 1,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles.length > 0) {
-        setFile(acceptedFiles[0]);
-        toast.success(`Fichier ajouté: ${acceptedFiles[0].name}`);
-      }
-    },
+    onDrop: onFileDrop,
     onDropRejected: (rejections) => {
       const error = rejections[0]?.errors[0];
       if (error?.code === 'file-too-large') {
@@ -50,26 +69,32 @@ export default function UploadBookPage() {
     },
   });
 
+  // Dropzone pour la couverture
+  const onCoverDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('La couverture ne doit pas dépasser 5 MB');
+        return;
+      }
+      setCover(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      toast.success(`Couverture ajoutée: ${file.name}`);
+    }
+  }, []);
+
   const { getRootProps: getCoverRootProps, getInputProps: getCoverInputProps, isDragActive: isCoverDragActive } = useDropzone({
     accept: {
       'image/jpeg': ['.jpg', '.jpeg'],
       'image/png': ['.png'],
       'image/webp': ['.webp'],
     },
-    maxSize: 5 * 1024 * 1024,
     maxFiles: 1,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles.length > 0) {
-        const file = acceptedFiles[0];
-        setCover(file);
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setCoverPreview(reader.result as string);
-        };
-        reader.readAsDataURL(file);
-        toast.success(`Couverture ajoutée: ${file.name}`);
-      }
-    },
+    onDrop: onCoverDrop,
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -81,9 +106,14 @@ export default function UploadBookPage() {
     setCoverPreview(null);
   };
 
+  const handleRemoveFile = () => {
+    setFile(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validations
     if (!file) {
       toast.error('Veuillez sélectionner un fichier');
       return;
@@ -100,21 +130,33 @@ export default function UploadBookPage() {
     }
 
     setLoading(true);
+    setUploadProgress(0);
 
     try {
       const formData = new FormData();
       formData.append('file', file);
       if (cover) formData.append('cover', cover);
       formData.append('title', form.title);
-      formData.append('description', form.description);
+      formData.append('description', form.description || '');
       formData.append('author', form.author);
       formData.append('category', form.category);
-      formData.append('subCategory', form.subCategory);
-      formData.append('subject', form.subject);
-      formData.append('year', form.year);
+      formData.append('subCategory', form.subCategory || '');
+      formData.append('subject', form.subject || '');
+      formData.append('year', form.year || '');
 
       const token = localStorage.getItem('token');
       
+      // Simuler la progression
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 500);
+
       const response = await fetch('/api/books', {
         method: 'POST',
         headers: {
@@ -123,13 +165,8 @@ export default function UploadBookPage() {
         body: formData,
       });
 
-      // Vérifier si la réponse est du JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Réponse non-JSON:', text);
-        throw new Error('Le serveur a renvoyé une réponse invalide');
-      }
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       const data = await response.json();
 
@@ -139,12 +176,15 @@ export default function UploadBookPage() {
       }
 
       toast.success('Document partagé avec succès !');
-      router.push('/books');
+      setTimeout(() => {
+        router.push('/books');
+      }, 1000);
     } catch (error: any) {
       console.error('Erreur:', error);
-      toast.error(error.message || 'Erreur lors du partage. Veuillez réessayer.');
+      toast.error(error.message || 'Erreur lors du partage');
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -187,6 +227,20 @@ export default function UploadBookPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Barre de progression */}
+          {loading && (
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div 
+                className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+              <p className="text-xs text-gray-500 mt-1 text-right">
+                {uploadProgress}% - Publication en cours...
+              </p>
+            </div>
+          )}
+
+          {/* Titre */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Titre du document <span className="text-red-500">*</span>
@@ -202,6 +256,7 @@ export default function UploadBookPage() {
             />
           </div>
 
+          {/* Auteur */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Auteur <span className="text-red-500">*</span>
@@ -217,6 +272,7 @@ export default function UploadBookPage() {
             />
           </div>
 
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
@@ -229,6 +285,7 @@ export default function UploadBookPage() {
             />
           </div>
 
+          {/* Catégorie et sous-catégorie */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
@@ -257,6 +314,7 @@ export default function UploadBookPage() {
             </div>
           </div>
 
+          {/* Matière et année */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Matière</label>
@@ -282,6 +340,7 @@ export default function UploadBookPage() {
             </div>
           </div>
 
+          {/* Fichier */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fichier <span className="text-red-500">*</span>
@@ -308,7 +367,7 @@ export default function UploadBookPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                    onClick={(e) => { e.stopPropagation(); handleRemoveFile(); }}
                     className="ml-4 text-gray-400 hover:text-red-500 transition-colors"
                   >
                     <Icons.Close className="w-5 h-5" />
@@ -329,6 +388,7 @@ export default function UploadBookPage() {
             </div>
           </div>
 
+          {/* Couverture */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Photo de couverture</label>
             <div
@@ -373,6 +433,7 @@ export default function UploadBookPage() {
             </div>
           </div>
 
+          {/* Bouton de soumission */}
           <button
             type="submit"
             disabled={loading || !file}

@@ -63,18 +63,15 @@ const upload = multer({
 // ===== AUTH MIDDLEWARE =====
 const auth = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  console.log('🔐 Auth header:', authHeader ? 'Présent' : 'Absent');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Token manquant ou invalide' });
   }
   
   const token = authHeader.split(' ')[1];
-  console.log('🔐 Token:', token ? 'Présent' : 'Absent');
   
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    console.log('🔐 Utilisateur décodé:', decoded.email);
     req.user = decoded;
     next();
   } catch (error) {
@@ -105,7 +102,6 @@ app.get('/api/health', async (req, res) => {
 // Inscription
 app.post('/api/auth/register', async (req, res) => {
   try {
-    console.log('📝 Inscription:', req.body.email);
     const { name, email, password } = req.body;
     
     const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -136,7 +132,6 @@ app.post('/api/auth/register', async (req, res) => {
 // Connexion
 app.post('/api/auth/login', async (req, res) => {
   try {
-    console.log('🔐 Tentative de connexion:', req.body.email);
     const { email, password } = req.body;
     
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -201,6 +196,26 @@ app.put('/api/auth/profile', auth, async (req, res) => {
   }
 });
 
+// ===== CATEGORIES ROUTES =====
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = [
+      { id: '1', name: 'Mathématiques' },
+      { id: '2', name: 'Physique' },
+      { id: '3', name: 'Chimie' },
+      { id: '4', name: 'Anglais' },
+      { id: '5', name: 'Philosophie' },
+      { id: '6', name: 'Histoire' },
+      { id: '7', name: 'Informatique' },
+      { id: '8', name: 'SVT' }
+    ];
+    res.json({ success: true, categories });
+  } catch (error) {
+    console.error('❌ Erreur categories:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ===== DOCUMENTS ROUTES =====
 
 // Upload d'un document
@@ -210,28 +225,21 @@ app.post('/api/books', auth, upload.fields([
 ]), async (req, res) => {
   try {
     console.log('📤 Upload document reçu');
-    console.log('📄 Body:', req.body);
-    console.log('📁 Fichiers:', req.files ? Object.keys(req.files) : 'Aucun');
     
     const files = req.files;
     const file = files && files.file ? files.file[0] : null;
     const cover = files && files.cover ? files.cover[0] : null;
 
     if (!file) {
-      console.log('❌ Aucun fichier');
       return res.status(400).json({ error: 'Aucun fichier téléchargé' });
     }
-
-    console.log('📄 Fichier:', file.originalname, file.size);
 
     const { title, description, author, category, subCategory, subject, year } = req.body;
 
     if (!title || !author) {
-      console.log('❌ Titre ou auteur manquant');
       return res.status(400).json({ error: 'Titre et auteur sont requis' });
     }
 
-    // Déterminer le type de fichier
     const ext = path.extname(file.originalname).toLowerCase();
     const fileTypeMap = {
       '.pdf': 'pdf',
@@ -242,22 +250,21 @@ app.post('/api/books', auth, upload.fields([
     const fileType = fileTypeMap[ext] || 'pdf';
 
     const coverUrl = cover ? `/uploads/${cover.filename}` : null;
-
-    console.log('💾 Sauvegarde dans la base de données...');
+    const coverKey = cover ? cover.filename : null;
 
     const result = await pool.query(
       `INSERT INTO books 
        (title, description, author, category, sub_category, subject, 
         file_type, file_url, file_key, file_name, file_size, 
-        cover_url, uploaded_by, uploaded_by_name, year)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        cover_url, cover_key, uploaded_by, uploaded_by_name, year)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING id, title, author, file_url, cover_url`,
       [
         title, description || '', author, category || 'general', 
         subCategory || '', subject || '',
         fileType, `/uploads/${file.filename}`, file.filename,
         file.originalname, file.size,
-        coverUrl, req.user.id, req.user.name || 'Anonyme', year || ''
+        coverUrl, coverKey, req.user.id, req.user.name || 'Anonyme', year || ''
       ]
     );
 
@@ -361,12 +368,54 @@ app.get('/api/books/:id/download', async (req, res) => {
   }
 });
 
+// Supprimer un livre
+app.delete('/api/books/:id', auth, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM books WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Document non trouvé' });
+    }
+
+    const book = result.rows[0];
+    
+    // Vérifier que l'utilisateur est le propriétaire ou admin
+    if (book.uploaded_by !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Non autorisé' });
+    }
+
+    // Supprimer les fichiers
+    if (book.file_key && fs.existsSync(path.join(__dirname, book.file_url))) {
+      fs.unlinkSync(path.join(__dirname, book.file_url));
+    }
+    if (book.cover_key && fs.existsSync(path.join(__dirname, book.cover_url))) {
+      fs.unlinkSync(path.join(__dirname, book.cover_url));
+    }
+
+    await pool.query('DELETE FROM books WHERE id = $1', [req.params.id]);
+
+    res.json({ success: true, message: 'Document supprimé' });
+  } catch (error) {
+    console.error('❌ Erreur delete:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ===== STATS =====
+app.get('/api/documents/stats', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT COUNT(*) as total FROM books WHERE is_published = 1');
+    res.json({ success: true, stats: { documents: parseInt(result.rows[0].total) || 0 } });
+  } catch (error) {
+    console.error('❌ Erreur stats:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ===== DÉMARRAGE =====
 
 // Créer les tables si elles n'existent pas
 const initDB = async () => {
   try {
-    // Table users
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -385,7 +434,6 @@ const initDB = async () => {
       )
     `);
 
-    // Table books
     await pool.query(`
       CREATE TABLE IF NOT EXISTS books (
         id SERIAL PRIMARY KEY,
