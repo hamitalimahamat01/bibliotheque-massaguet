@@ -20,13 +20,11 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Middleware
+// Middleware - IMPORTANT: mettre multer AVANT express.json()
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   credentials: true,
 }));
-app.use(express.json());
-app.use('/uploads', express.static('uploads'));
 
 // Configuration Multer
 const storage = multer.diskStorage({
@@ -39,7 +37,8 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, unique + path.extname(file.originalname));
+    const ext = path.extname(file.originalname);
+    cb(null, unique + ext);
   }
 });
 
@@ -50,7 +49,7 @@ const fileFilter = (req, file, cb) => {
   if (allowedExts.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Format de fichier non supporté'), false);
+    cb(new Error('Format de fichier non supporté: ' + ext), false);
   }
 };
 
@@ -59,6 +58,12 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter
 });
+
+// Appeler express.json() APRÈS multer pour les routes qui n'utilisent pas de fichiers
+app.use(express.json());
+
+// Servir les fichiers statiques
+app.use('/uploads', express.static('uploads'));
 
 // ===== AUTH MIDDLEWARE =====
 const auth = (req, res, next) => {
@@ -218,25 +223,32 @@ app.get('/api/categories', async (req, res) => {
 
 // ===== DOCUMENTS ROUTES =====
 
-// Upload d'un document
+// Upload d'un document - AVEC LOGS DÉTAILLÉS
 app.post('/api/books', auth, upload.fields([
   { name: 'file', maxCount: 1 },
   { name: 'cover', maxCount: 1 }
 ]), async (req, res) => {
   try {
-    console.log('📤 Upload document reçu');
+    console.log('📤 ===== UPLOAD REÇU =====');
+    console.log('📄 Body:', req.body);
+    console.log('📁 Files:', req.files ? Object.keys(req.files) : 'Aucun fichier');
     
     const files = req.files;
     const file = files && files.file ? files.file[0] : null;
     const cover = files && files.cover ? files.cover[0] : null;
 
+    console.log('📄 Fichier principal:', file ? file.originalname : 'NON');
+    console.log('📄 Couverture:', cover ? cover.originalname : 'NON');
+
     if (!file) {
+      console.log('❌ Aucun fichier principal');
       return res.status(400).json({ error: 'Aucun fichier téléchargé' });
     }
 
     const { title, description, author, category, subCategory, subject, year } = req.body;
 
     if (!title || !author) {
+      console.log('❌ Titre ou auteur manquant');
       return res.status(400).json({ error: 'Titre et auteur sont requis' });
     }
 
@@ -250,25 +262,26 @@ app.post('/api/books', auth, upload.fields([
     const fileType = fileTypeMap[ext] || 'pdf';
 
     const coverUrl = cover ? `/uploads/${cover.filename}` : null;
-    const coverKey = cover ? cover.filename : null;
+
+    console.log('💾 Sauvegarde dans la base de données...');
 
     const result = await pool.query(
       `INSERT INTO books 
        (title, description, author, category, sub_category, subject, 
         file_type, file_url, file_key, file_name, file_size, 
-        cover_url, cover_key, uploaded_by, uploaded_by_name, year)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        cover_url, uploaded_by, uploaded_by_name, year)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id, title, author, file_url, cover_url`,
       [
         title, description || '', author, category || 'general', 
         subCategory || '', subject || '',
         fileType, `/uploads/${file.filename}`, file.filename,
         file.originalname, file.size,
-        coverUrl, coverKey, req.user.id, req.user.name || 'Anonyme', year || ''
+        coverUrl, req.user.id, req.user.name || 'Anonyme', year || ''
       ]
     );
 
-    console.log('✅ Document créé:', result.rows[0].id);
+    console.log('✅ Document créé avec succès ID:', result.rows[0].id);
     res.status(201).json({
       success: true,
       message: 'Document partagé avec succès',
@@ -279,11 +292,11 @@ app.post('/api/books', auth, upload.fields([
     // Supprimer les fichiers en cas d'erreur
     const files = req.files;
     if (files) {
-      if (files.file && files.file[0] && files.file[0].path && fs.existsSync(files.file[0].path)) {
-        fs.unlinkSync(files.file[0].path);
+      if (files.file && files.file[0] && files.file[0].path) {
+        try { fs.unlinkSync(files.file[0].path); } catch(e) {}
       }
-      if (files.cover && files.cover[0] && files.cover[0].path && fs.existsSync(files.cover[0].path)) {
-        fs.unlinkSync(files.cover[0].path);
+      if (files.cover && files.cover[0] && files.cover[0].path) {
+        try { fs.unlinkSync(files.cover[0].path); } catch(e) {}
       }
     }
     res.status(500).json({ error: 'Erreur lors du téléchargement: ' + error.message });
@@ -378,12 +391,10 @@ app.delete('/api/books/:id', auth, async (req, res) => {
 
     const book = result.rows[0];
     
-    // Vérifier que l'utilisateur est le propriétaire ou admin
     if (book.uploaded_by !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Non autorisé' });
     }
 
-    // Supprimer les fichiers
     if (book.file_key && fs.existsSync(path.join(__dirname, book.file_url))) {
       fs.unlinkSync(path.join(__dirname, book.file_url));
     }
@@ -413,7 +424,6 @@ app.get('/api/documents/stats', async (req, res) => {
 
 // ===== DÉMARRAGE =====
 
-// Créer les tables si elles n'existent pas
 const initDB = async () => {
   try {
     await pool.query(`
@@ -466,6 +476,7 @@ const initDB = async () => {
   }
 };
 
+// Créer le dossier uploads
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads', { recursive: true });
 }
