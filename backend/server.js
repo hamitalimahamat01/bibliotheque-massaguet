@@ -20,7 +20,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Middleware - IMPORTANT: mettre multer AVANT express.json()
+// Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   credentials: true,
@@ -59,10 +59,7 @@ const upload = multer({
   fileFilter
 });
 
-// Appeler express.json() APRÈS multer pour les routes qui n'utilisent pas de fichiers
 app.use(express.json());
-
-// Servir les fichiers statiques
 app.use('/uploads', express.static('uploads'));
 
 // ===== AUTH MIDDLEWARE =====
@@ -223,32 +220,25 @@ app.get('/api/categories', async (req, res) => {
 
 // ===== DOCUMENTS ROUTES =====
 
-// Upload d'un document - AVEC LOGS DÉTAILLÉS
+// Upload d'un document
 app.post('/api/books', auth, upload.fields([
   { name: 'file', maxCount: 1 },
   { name: 'cover', maxCount: 1 }
 ]), async (req, res) => {
   try {
     console.log('📤 ===== UPLOAD REÇU =====');
-    console.log('📄 Body:', req.body);
-    console.log('📁 Files:', req.files ? Object.keys(req.files) : 'Aucun fichier');
     
     const files = req.files;
     const file = files && files.file ? files.file[0] : null;
     const cover = files && files.cover ? files.cover[0] : null;
 
-    console.log('📄 Fichier principal:', file ? file.originalname : 'NON');
-    console.log('📄 Couverture:', cover ? cover.originalname : 'NON');
-
     if (!file) {
-      console.log('❌ Aucun fichier principal');
       return res.status(400).json({ error: 'Aucun fichier téléchargé' });
     }
 
     const { title, description, author, category, subCategory, subject, year } = req.body;
 
     if (!title || !author) {
-      console.log('❌ Titre ou auteur manquant');
       return res.status(400).json({ error: 'Titre et auteur sont requis' });
     }
 
@@ -262,8 +252,6 @@ app.post('/api/books', auth, upload.fields([
     const fileType = fileTypeMap[ext] || 'pdf';
 
     const coverUrl = cover ? `/uploads/${cover.filename}` : null;
-
-    console.log('💾 Sauvegarde dans la base de données...');
 
     const result = await pool.query(
       `INSERT INTO books 
@@ -289,7 +277,6 @@ app.post('/api/books', auth, upload.fields([
     });
   } catch (error) {
     console.error('❌ Erreur upload:', error);
-    // Supprimer les fichiers en cas d'erreur
     const files = req.files;
     if (files) {
       if (files.file && files.file[0] && files.file[0].path) {
@@ -306,7 +293,7 @@ app.post('/api/books', auth, upload.fields([
 // Récupérer tous les livres
 app.get('/api/books', async (req, res) => {
   try {
-    const { category, search, limit = 12, page = 1 } = req.query;
+    const { category, search, limit = 12, page = 1, subCategory, subject, year } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
     let query = 'SELECT * FROM books WHERE is_published = 1';
@@ -316,6 +303,24 @@ app.get('/api/books', async (req, res) => {
     if (category) {
       query += ` AND category = $${paramCount}`;
       params.push(category);
+      paramCount++;
+    }
+
+    if (subCategory) {
+      query += ` AND sub_category = $${paramCount}`;
+      params.push(subCategory);
+      paramCount++;
+    }
+
+    if (subject) {
+      query += ` AND subject ILIKE $${paramCount}`;
+      params.push(`%${subject}%`);
+      paramCount++;
+    }
+
+    if (year) {
+      query += ` AND year = $${paramCount}`;
+      params.push(year);
       paramCount++;
     }
 
@@ -364,17 +369,38 @@ app.get('/api/books/:id', async (req, res) => {
 // Télécharger un livre
 app.get('/api/books/:id/download', async (req, res) => {
   try {
+    console.log('📥 Téléchargement demandé pour ID:', req.params.id);
+    
     const result = await pool.query('SELECT file_url, file_name FROM books WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
+      console.log('❌ Document non trouvé');
       return res.status(404).json({ error: 'Document non trouvé' });
     }
 
-    const filePath = path.join(__dirname, result.rows[0].file_url);
+    const book = result.rows[0];
+    const filePath = path.join(__dirname, book.file_url);
+    
+    console.log('📁 Chemin du fichier:', filePath);
+    console.log('📄 Nom du fichier:', book.file_name);
+    
+    // Vérifier que le fichier existe
     if (!fs.existsSync(filePath)) {
+      console.log('❌ Fichier introuvable:', filePath);
       return res.status(404).json({ error: 'Fichier introuvable' });
     }
 
-    res.download(filePath, result.rows[0].file_name);
+    // Incrémenter le compteur de téléchargements
+    await pool.query('UPDATE books SET downloads = downloads + 1 WHERE id = $1', [req.params.id]);
+
+    // Envoyer le fichier
+    res.download(filePath, book.file_name, (err) => {
+      if (err) {
+        console.error('❌ Erreur lors du téléchargement:', err);
+        res.status(500).json({ error: 'Erreur lors du téléchargement' });
+      } else {
+        console.log('✅ Téléchargement réussi');
+      }
+    });
   } catch (error) {
     console.error('❌ Erreur download:', error);
     res.status(500).json({ error: 'Erreur serveur' });
