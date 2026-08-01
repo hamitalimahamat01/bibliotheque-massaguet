@@ -79,6 +79,13 @@ export default function LoginPage() {
     }
   };
 
+  const handleForgotPassword = () => {
+    toast('Fonctionnalité à venir', {
+      icon: '🔜',
+      duration: 3000,
+    });
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       <div className="w-full max-w-md">
@@ -213,7 +220,7 @@ export default function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => toast.info('Fonctionnalité à venir')}
+                  onClick={handleForgotPassword}
                   className="text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
                 >
                   Mot de passe oublié ?
