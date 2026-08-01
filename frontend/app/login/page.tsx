@@ -14,13 +14,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
   const { login, user } = useAuth();
   const { data: session } = useSession();
   const router = useRouter();
 
   useEffect(() => {
     if (user || session?.user) {
-      router.push('/profile');
+      router.push('/profile/complete');
     }
   }, [user, session, router]);
 
@@ -34,7 +36,6 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      // Tentative de connexion avec le backend
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,14 +49,14 @@ export default function LoginPage() {
         return;
       }
 
-      // Stocker le token
       localStorage.setItem('token', data.token);
+      if (rememberMe) {
+        localStorage.setItem('remember', 'true');
+      }
       
-      // Mettre à jour le contexte
       await login(email, password);
-      
       toast.success('Connexion réussie !');
-      router.push('/profile');
+      router.push('/profile/complete');
     } catch (error) {
       console.error('Erreur de connexion:', error);
       toast.error('Erreur lors de la connexion');
@@ -68,7 +69,7 @@ export default function LoginPage() {
     setGoogleLoading(true);
     try {
       await signIn('google', {
-        callbackUrl: '/profile',
+        callbackUrl: '/profile/complete',
         redirect: true,
       });
     } catch (error) {
@@ -79,37 +80,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 auth-gradient">
-      <div className="w-full max-w-[440px] animate-slide-up">
-        <div className="text-center mb-10">
-          <div className="logo-float inline-block">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#2d2d44] flex items-center justify-center mx-auto shadow-xl shadow-[#1a1a2e]/10">
-              <Icons.Book className="w-10 h-10 text-white/90" />
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div className="w-full max-w-md">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/30 animate-slide-up">
+          {/* Logo et titre */}
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-indigo-500/30 mb-4">
+              <Icons.Book className="w-10 h-10 text-white" />
             </div>
+            <h1 className="text-2xl font-bold text-gray-800">Bienvenue</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {isLogin ? 'Connectez-vous à votre compte' : 'Créez votre compte'}
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mt-5 tracking-tight">
-            Bibliothèque Massaguet
-          </h1>
-          <p className="text-sm text-gray-400 mt-1.5 tracking-wide">
-            Connectez-vous à votre compte
-          </p>
-        </div>
 
-        <div className="auth-card rounded-3xl p-8 shine">
           {/* Bouton Google */}
           <button
             onClick={handleGoogleLogin}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 py-3.5 px-4 auth-btn-secondary rounded-2xl font-medium text-gray-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             {googleLoading ? (
-              <>
-                <svg className="animate-spin w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Connexion en cours...
-              </>
+              <svg className="animate-spin w-5 h-5 text-gray-400" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
             ) : (
               <>
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -118,33 +113,49 @@ export default function LoginPage() {
                   <path fill="#4A90E2" d="M19.8344019,20.9997513 C22.0291677,18.9528514 23.4545455,15.903663 23.4545455,12 C23.4545455,11.2909091 23.3454545,10.5272727 23.1818182,9.81818182 L12,9.81818182 L12,14.4545455 L18.4363636,14.4545455 C18.1187732,16.013626 17.2662994,17.2212117 16.0407265,18.0125889 L19.8344019,20.9997513 Z" />
                   <path fill="#FBBC05" d="M5.27698198,14.2678769 C5.03832634,13.556323 4.90909091,12.7937589 4.90909091,12 C4.90909091,11.2182781 5.03443647,10.4668121 5.26620003,9.76452941 L1.23954545,6.65072727 C0.43658727,8.26043158 0,10.0753848 0,12 C0,13.9195484 0.444780743,15.7301709 1.23746264,17.3349879 L5.27698198,14.2678769 Z" />
                 </svg>
-                Continuer avec Google
+                <span className="font-medium text-gray-700">Continuer avec Google</span>
               </>
             )}
           </button>
 
-          <div className="auth-divider my-6">
-            <span className="text-xs text-gray-400 font-medium tracking-wider uppercase px-2 bg-transparent">
-              ou
-            </span>
+          {/* Séparateur */}
+          <div className="flex items-center gap-4 my-6">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">ou</span>
+            <div className="flex-1 h-px bg-gray-200" />
           </div>
 
-          {/* Formulaire Email/Password */}
+          {/* Formulaire */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom complet</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Icons.User className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder="Votre nom"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">
-                Adresse email
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Adresse email</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Icons.Email className="w-4 h-4 text-gray-300" />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Icons.Email className="w-5 h-5 text-gray-400" />
                 </div>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3.5 auth-input rounded-2xl text-sm text-gray-800 placeholder:text-gray-300 focus:outline-none"
                   placeholder="exemple@email.com"
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                   required
                   disabled={loading}
                 />
@@ -152,12 +163,10 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">
-                Mot de passe
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Mot de passe</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <svg className="w-4 h-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0110 0v4" />
                   </svg>
@@ -166,23 +175,23 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-12 py-3.5 auth-input rounded-2xl text-sm text-gray-800 placeholder:text-gray-300 focus:outline-none"
                   placeholder="••••••••"
+                  className="w-full pl-10 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                   required
                   disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-300 hover:text-gray-500 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showPassword ? (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
                       <line x1="1" y1="1" x2="23" y2="23" />
                     </svg>
                   ) : (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
@@ -191,41 +200,69 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {isLogin && (
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-gray-600">Se souvenir de moi</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => toast.info('Fonctionnalité à venir')}
+                  className="text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+                >
+                  Mot de passe oublié ?
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 auth-btn-primary rounded-2xl font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
-                  <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                   Connexion...
                 </>
               ) : (
-                'Se connecter'
+                isLogin ? 'Se connecter' : 'Créer un compte'
               )}
             </button>
           </form>
 
+          {/* Bas de page */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-400">
-              Pas encore de compte ?{' '}
-              <Link
-                href="/register"
-                className="text-gray-600 font-medium hover:text-gray-800 transition-colors"
+            <p className="text-sm text-gray-500">
+              {isLogin ? "Pas encore de compte ?" : "Déjà un compte ?"}
+              {' '}
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
               >
-                Créer un compte
-              </Link>
+                {isLogin ? "S'inscrire" : "Se connecter"}
+              </button>
             </p>
           </div>
-        </div>
 
-        <p className="text-center text-xs text-gray-400/60 mt-8 tracking-wide">
-          Bibliothèque Massaguet • Accès sécurisé
-        </p>
+          {/* Sécurisé */}
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-400">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" />
+            </svg>
+            <span>Connexion sécurisée • Bibliothèque Massaguet</span>
+          </div>
+        </div>
       </div>
     </div>
   );

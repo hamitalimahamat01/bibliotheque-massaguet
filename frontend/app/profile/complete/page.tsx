@@ -1,0 +1,203 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { Icons } from '@/components/Icons';
+import toast from 'react-hot-toast';
+
+export default function CompleteProfilePage() {
+  const { user, updateProfile, logout } = useAuth();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [skipping, setSkipping] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    gender: '',
+    city: '',
+    birthDate: '',
+    bio: '',
+  });
+
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+    }
+  }, [user, router]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await updateProfile(formData);
+      toast.success('Profil complété avec succès !');
+      router.push('/');
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast.error('Erreur lors de la sauvegarde du profil');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    setSkipping(true);
+    try {
+      router.push('/');
+    } catch (error) {
+      console.error('Erreur:', error);
+    } finally {
+      setSkipping(false);
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div className="w-full max-w-2xl">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/30 animate-slide-up">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-indigo-500/30 mb-4">
+              <Icons.User className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">Complétez votre profil</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              Bienvenue {user.name || 'sur Massaguet'} ! 
+              <span className="block text-xs text-gray-400 mt-1">
+                Ces informations nous aideront à mieux vous connaître
+              </span>
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Prénom</label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                  placeholder="Votre prénom"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                  placeholder="Votre nom"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Sexe</label>
+              <select
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+              >
+                <option value="">Sélectionnez...</option>
+                <option value="M">Homme</option>
+                <option value="F">Femme</option>
+                <option value="A">Autre</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Ville</label>
+              <input
+                type="text"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                placeholder="Votre ville"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de naissance</label>
+              <input
+                type="date"
+                name="birthDate"
+                value={formData.birthDate}
+                onChange={handleChange}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Bio (optionnel)</label>
+              <textarea
+                name="bio"
+                value={formData.bio}
+                onChange={handleChange}
+                rows={3}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all resize-vertical"
+                placeholder="Parlez-nous de vous..."
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3.5 rounded-xl font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Enregistrement...
+                  </>
+                ) : (
+                  'Enregistrer mon profil'
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleSkip}
+                disabled={skipping}
+                className="flex-1 bg-gray-100 text-gray-600 py-3.5 rounded-xl font-medium hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {skipping ? 'Redirection...' : 'Passer pour l\'instant'}
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-6 text-center border-t border-gray-200 pt-4">
+            <button
+              onClick={logout}
+              className="text-sm text-red-500 hover:text-red-700 transition-colors flex items-center justify-center gap-2 mx-auto"
+            >
+              <Icons.Logout className="w-4 h-4" />
+              Se déconnecter
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
