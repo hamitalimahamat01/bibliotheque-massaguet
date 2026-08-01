@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+// Utiliser l'URL du backend Render en production, ou localhost en développement
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://bibliotheque-backend-wfkn.onrender.com/api'
+  : 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_URL,

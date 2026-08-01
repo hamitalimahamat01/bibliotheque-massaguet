@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 const { authMiddleware } = require('../middlewares/auth.middleware');
+const { body, validationResult } = require('express-validator');
 
 // ===== VALIDATION =====
 const validate = (req, res, next) => {
@@ -22,11 +22,9 @@ router.post('/register', [
   body('password').isLength({ min: 6 }).withMessage('Mot de passe trop court'),
   validate
 ], async (req, res) => {
-  const startTime = Date.now();
   try {
     const { name, email, password } = req.body;
 
-    // Vérifier si l'utilisateur existe
     const existing = await prisma.user.findUnique({
       where: { email },
       select: { id: true }
@@ -36,10 +34,8 @@ router.post('/register', [
       return res.status(400).json({ error: 'Cet email est déjà utilisé' });
     }
 
-    // Hasher le mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Créer l'utilisateur
     const user = await prisma.user.create({
       data: {
         name,
@@ -55,14 +51,12 @@ router.post('/register', [
       },
     });
 
-    // Générer le token
     const token = jwt.sign(
       { id: user.id, email: user.email },
       process.env.JWT_SECRET || 'secret',
       { expiresIn: '7d' }
     );
 
-    console.log(`✅ Inscription ${user.email} en ${Date.now() - startTime}ms`);
     res.status(201).json({ success: true, token, user });
   } catch (error) {
     console.error('❌ Erreur register:', error);
@@ -76,11 +70,9 @@ router.post('/login', [
   body('password').notEmpty().withMessage('Mot de passe requis'),
   validate
 ], async (req, res) => {
-  const startTime = Date.now();
   try {
     const { email, password } = req.body;
 
-    // Récupérer l'utilisateur avec le mot de passe
     const user = await prisma.user.findUnique({
       where: { email },
       select: {
@@ -93,27 +85,15 @@ router.post('/login', [
       },
     });
 
-    if (!user) {
+    if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
 
-    if (!user.isActive) {
-      return res.status(403).json({ error: 'Compte désactivé' });
-    }
-
-    // Vérifier le mot de passe
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
 
-    // Mettre à jour la dernière connexion
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
-    });
-
-    // Générer le token
     const token = jwt.sign(
       { id: user.id, email: user.email },
       process.env.JWT_SECRET || 'secret',
@@ -121,7 +101,6 @@ router.post('/login', [
     );
 
     const { password: _, ...userData } = user;
-    console.log(`✅ Connexion ${user.email} en ${Date.now() - startTime}ms`);
     res.json({ success: true, token, user: userData });
   } catch (error) {
     console.error('❌ Erreur login:', error);
@@ -131,7 +110,6 @@ router.post('/login', [
 
 // ===== PROFIL =====
 router.get('/profile', authMiddleware, async (req, res) => {
-  const startTime = Date.now();
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -147,8 +125,8 @@ router.get('/profile', authMiddleware, async (req, res) => {
         gender: true,
         city: true,
         birthDate: true,
-        createdAt: true,
         documentsCount: true,
+        createdAt: true,
       },
     });
 
@@ -156,7 +134,6 @@ router.get('/profile', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
-    console.log(`✅ Profil chargé en ${Date.now() - startTime}ms`);
     res.json({ success: true, user });
   } catch (error) {
     console.error('❌ Erreur profile:', error);
@@ -174,7 +151,6 @@ router.put('/profile', authMiddleware, [
   body('bio').optional().isString(),
   validate
 ], async (req, res) => {
-  const startTime = Date.now();
   try {
     const { firstName, lastName, gender, city, birthDate, bio } = req.body;
 
@@ -204,7 +180,6 @@ router.put('/profile', authMiddleware, [
       },
     });
 
-    console.log(`✅ Profil mis à jour en ${Date.now() - startTime}ms`);
     res.json({ success: true, user });
   } catch (error) {
     console.error('❌ Erreur update profile:', error);
@@ -214,7 +189,6 @@ router.put('/profile', authMiddleware, [
 
 // ===== STATISTIQUES =====
 router.get('/stats', authMiddleware, async (req, res) => {
-  const startTime = Date.now();
   try {
     const [totalUsers, totalBooks, totalDownloads] = await Promise.all([
       prisma.user.count(),
@@ -235,7 +209,6 @@ router.get('/stats', authMiddleware, async (req, res) => {
       },
     });
 
-    console.log(`✅ Stats chargées en ${Date.now() - startTime}ms`);
     res.json({
       success: true,
       stats: {
@@ -248,39 +221,6 @@ router.get('/stats', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('❌ Erreur stats:', error);
     res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// ===== REFRESH TOKEN =====
-router.post('/refresh', async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) {
-      return res.status(400).json({ error: 'Refresh token requis' });
-    }
-
-    // Vérifier le refresh token
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'refresh_secret');
-    
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, email: true, role: true },
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'Utilisateur non trouvé' });
-    }
-
-    const newToken = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET || 'secret',
-      { expiresIn: '7d' }
-    );
-
-    res.json({ success: true, token: newToken });
-  } catch (error) {
-    console.error('❌ Erreur refresh:', error);
-    res.status(401).json({ error: 'Refresh token invalide' });
   }
 });
 
