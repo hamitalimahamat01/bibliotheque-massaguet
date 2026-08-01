@@ -7,41 +7,29 @@ import { useAuth } from '@/context/AuthContext';
 import { Icons } from '@/components/Icons';
 
 // Images du carrousel
-const carouselImages = [
-  { src: '/hero/books.svg', alt: 'Bibliothèque', label: 'Bibliothèque numérique' },
-  { src: '/hero/students.svg', alt: 'Étudiants', label: 'Étudiants de Massaguet' },
-  { src: '/hero/knowledge.svg', alt: 'Connaissance', label: 'Partage de connaissances' },
-  { src: '/hero/community.svg', alt: 'Communauté', label: 'Communauté éducative' },
+const CAROUSEL_IMAGES = [
+  { src: '/hero/books.svg', alt: 'Bibliothèque' },
+  { src: '/hero/students.svg', alt: 'Étudiants' },
+  { src: '/hero/knowledge.svg', alt: 'Connaissance' },
+  { src: '/hero/community.svg', alt: 'Communauté' },
 ];
 
 // Citations
-const citations = [
-  {
-    text: "La lecture est à l'esprit ce que l'exercice est au corps.",
-    author: "Joseph Addison",
-    role: "Écrivain",
-  },
-  {
-    text: "Un livre est un jardin qu'on porte dans sa poche.",
-    author: "Proverbe chinois",
-    role: "Proverbe",
-  },
-  {
-    text: "Celui qui lit a mille vies avant de mourir.",
-    author: "George R.R. Martin",
-    role: "Écrivain",
-  },
+const CITATIONS = [
+  { text: "La lecture est à l'esprit ce que l'exercice est au corps.", author: "Joseph Addison" },
+  { text: "Un livre est un jardin qu'on porte dans sa poche.", author: "Proverbe chinois" },
+  { text: "Celui qui lit a mille vies avant de mourir.", author: "George R.R. Martin" },
 ];
 
 // Statistiques
-const stats = [
+const STATS = [
   { value: '200+', label: 'Documents', icon: Icons.Book },
   { value: '50+', label: 'Étudiants', icon: Icons.User },
   { value: '100%', label: 'Gratuit', icon: Icons.Star },
 ];
 
 // Catégories
-const categories = [
+const CATEGORIES = [
   { title: 'Mathématiques', color: 'from-blue-500 to-cyan-500' },
   { title: 'Physique', color: 'from-purple-500 to-pink-500' },
   { title: 'Chimie', color: 'from-green-500 to-emerald-500' },
@@ -53,34 +41,30 @@ const categories = [
 export default function HomePage() {
   const { user } = useAuth();
   const [citationIndex, setCitationIndex] = useState(0);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageIndex, setImageIndex] = useState(0);
 
-  // Rotation des citations
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCitationIndex((prev) => (prev + 1) % citations.length);
+    const citationInterval = setInterval(() => {
+      setCitationIndex((prev) => (prev + 1) % CITATIONS.length);
     }, 8000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Rotation des images du carrousel
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % carouselImages.length);
+    const imageInterval = setInterval(() => {
+      setImageIndex((prev) => (prev + 1) % CAROUSEL_IMAGES.length);
     }, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(citationInterval);
+      clearInterval(imageInterval);
+    };
   }, []);
 
-  const citation = citations[citationIndex];
-  const currentImage = carouselImages[currentImageIndex];
+  const citation = CITATIONS[citationIndex];
+  const currentImage = CAROUSEL_IMAGES[imageIndex];
 
   return (
     <div className="animate-fade-in">
-      {/* === HERO SECTION AVEC CARROUSEL === */}
+      {/* === HERO === */}
       <section className="relative overflow-hidden rounded-3xl mb-12 min-h-[500px] flex items-center">
-        {/* Image de fond avec carrousel */}
-        <div className="absolute inset-0 z-0 transition-all duration-1000 ease-in-out">
-          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/60 via-purple-600/50 to-blue-600/60 z-10"></div>
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-800/70 via-purple-800/60 to-blue-800/70 z-10" />
           <Image
             src={currentImage.src}
             alt={currentImage.alt}
@@ -90,17 +74,13 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Indicateurs du carrousel */}
+        {/* Indicateurs */}
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 flex gap-2">
-          {carouselImages.map((_, index) => (
+          {CAROUSEL_IMAGES.map((_, index) => (
             <button
               key={index}
-              onClick={() => setCurrentImageIndex(index)}
-              className={`w-2 h-2 rounded-full transition-all ${
-                index === currentImageIndex 
-                  ? 'bg-white w-8' 
-                  : 'bg-white/50 hover:bg-white/80'
-              }`}
+              onClick={() => setImageIndex(index)}
+              className={`h-2 rounded-full transition-all ${index === imageIndex ? 'w-8 bg-white' : 'w-2 bg-white/50 hover:bg-white/80'}`}
               aria-label={`Image ${index + 1}`}
             />
           ))}
@@ -126,55 +106,35 @@ export default function HomePage() {
                 className="bg-white text-indigo-600 px-8 py-3.5 rounded-xl font-bold shadow-lg hover:shadow-2xl transition-all hover:scale-105 flex items-center gap-2"
               >
                 <Icons.Book className="w-5 h-5" />
-                Explorer la bibliothèque
+                Explorer
               </Link>
               <Link
-                href="/login"
-                className="bg-white/10 backdrop-blur-sm border border-white/30 text-white px-8 py-3.5 rounded-xl font-medium hover:bg-white/20 transition-all flex items-center gap-2"
+                href={user ? '/books/upload' : '/login'}
+                className={`px-8 py-3.5 rounded-xl font-medium transition-all flex items-center gap-2 ${
+                  user 
+                    ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl' 
+                    : 'bg-white/10 backdrop-blur-sm border border-white/30 text-white hover:bg-white/20'
+                }`}
               >
-                <Icons.Login className="w-5 h-5" />
-                Se connecter
+                <Icons.Upload className="w-5 h-5" />
+                {user ? 'Partager' : 'Se connecter'}
               </Link>
             </div>
-            {!user && (
-              <div className="flex flex-wrap gap-3 mt-6">
-                <Link
-                  href="/login"
-                  className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-white/30 transition-all flex items-center gap-2 text-sm"
-                >
-                  <Icons.Login className="w-4 h-4" />
-                  Connexion
-                </Link>
-                <Link
-                  href="/register"
-                  className="bg-white text-indigo-600 px-6 py-2.5 rounded-xl font-medium hover:bg-gray-100 transition-all flex items-center gap-2 text-sm"
-                >
-                  <Icons.Register className="w-4 h-4" />
-                  Inscription
-                </Link>
-              </div>
-            )}
           </div>
         </div>
       </section>
 
       {/* === STATS === */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        {stats.map((stat, index) => {
-          const IconComponent = stat.icon;
-          return (
-            <div
-              key={index}
-              className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all p-8 text-center border border-gray-100 card-hover group"
-            >
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                <IconComponent className="w-7 h-7 text-indigo-600" />
-              </div>
-              <div className="text-3xl font-bold text-gray-800">{stat.value}</div>
-              <div className="text-gray-500">{stat.label}</div>
+        {STATS.map((stat, index) => (
+          <div key={index} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all p-8 text-center border border-gray-100 card-hover group">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+              <stat.icon className="w-7 h-7 text-indigo-600" />
             </div>
-          );
-        })}
+            <div className="text-3xl font-bold text-gray-800">{stat.value}</div>
+            <div className="text-gray-500">{stat.label}</div>
+          </div>
+        ))}
       </section>
 
       {/* === CITATION === */}
@@ -185,21 +145,18 @@ export default function HomePage() {
           </div>
           <div className="flex-1 text-center md:text-left">
             <p className="text-xl md:text-2xl text-gray-700 italic font-light leading-relaxed">
-              "{citation.text}"
+              &ldquo;{citation.text}&rdquo;
             </p>
             <p className="text-indigo-600 font-semibold mt-2">
               — {citation.author}
-              <span className="text-gray-400 font-normal ml-2">{citation.role}</span>
             </p>
           </div>
           <div className="flex gap-2">
-            {citations.map((_, i) => (
+            {CITATIONS.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setCitationIndex(i)}
-                className={`w-2 h-2 rounded-full transition-all ${
-                  i === citationIndex ? 'bg-indigo-600 w-6' : 'bg-gray-300'
-                }`}
+                className={`h-2 rounded-full transition-all ${i === citationIndex ? 'w-6 bg-indigo-600' : 'w-2 bg-gray-300'}`}
               />
             ))}
           </div>
@@ -219,7 +176,7 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {categories.map((cat, index) => (
+          {CATEGORIES.map((cat, index) => (
             <Link
               key={index}
               href={`/books?category=${cat.title.toLowerCase()}`}
@@ -227,69 +184,44 @@ export default function HomePage() {
             >
               <Icons.Book className="w-8 h-8 mx-auto mb-2 text-white/80" />
               <span className="text-sm font-medium block">{cat.title}</span>
-              <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all"></div>
+              <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all" />
             </Link>
           ))}
         </div>
       </section>
 
-      {/* === DÉVELOPPEUR & UNION === */}
+      {/* === DÉVELOPPEUR === */}
       <section className="mb-12">
         <div className="flex items-center gap-3 mb-6">
           <Icons.Users className="w-7 h-7 text-indigo-600" />
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">Équipe & contributeurs</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">Équipe &amp; contributeurs</h2>
         </div>
-        
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-          {/* Développeur */}
           <div className="p-8 border-b border-gray-100">
             <div className="flex items-center gap-2 mb-4">
               <Icons.Code className="w-5 h-5 text-indigo-600" />
               <h3 className="text-lg font-bold text-gray-800">Développeur</h3>
             </div>
-            
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6 bg-gray-50 rounded-xl p-6">
               <div className="flex-shrink-0">
                 <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-                  <Image
-                    src="/team/ali.svg"
-                    alt="Ali Mahamat"
-                    width={96}
-                    height={96}
-                    className="w-full h-full object-cover"
-                  />
+                  <Image src="/team/ali.svg" alt="Ali Mahamat" width={96} height={96} className="w-full h-full object-cover" />
                 </div>
               </div>
               <div className="flex-1 text-center md:text-left">
                 <h4 className="text-xl font-bold text-gray-800">Ali Mahamat</h4>
                 <p className="text-indigo-600 font-medium">Développeur Full-Stack</p>
                 <p className="text-gray-500 text-sm mt-2 leading-relaxed">
-                  Étudiant passionné de Massaguet, créateur de cette plateforme éducative pour faciliter l'accès à la connaissance.
+                  Étudiant passionné de Massaguet, créateur de cette plateforme éducative.
                 </p>
                 <div className="flex justify-center md:justify-start gap-3 mt-4">
-                  <a
-                    href="https://github.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors text-gray-600 hover:text-gray-900"
-                    aria-label="GitHub"
-                  >
+                  <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors text-gray-600 hover:text-gray-900">
                     <Icons.Github className="w-5 h-5" />
                   </a>
-                  <a
-                    href="https://linkedin.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-lg bg-gray-200 hover:bg-[#0077b5]/10 transition-colors text-gray-600 hover:text-[#0077b5]"
-                    aria-label="LinkedIn"
-                  >
+                  <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-gray-200 hover:bg-[#0077b5]/10 transition-colors text-gray-600 hover:text-[#0077b5]">
                     <Icons.LinkedIn className="w-5 h-5" />
                   </a>
-                  <a
-                    href="mailto:ali@massaguet.edu"
-                    className="p-2 rounded-lg bg-gray-200 hover:bg-red-50 transition-colors text-gray-600 hover:text-red-500"
-                    aria-label="Email"
-                  >
+                  <a href="mailto:ali@massaguet.edu" className="p-2 rounded-lg bg-gray-200 hover:bg-red-50 transition-colors text-gray-600 hover:text-red-500">
                     <Icons.Email className="w-5 h-5" />
                   </a>
                 </div>
@@ -297,96 +229,67 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Union des étudiants de Massaguet */}
+          {/* Union */}
           <div className="p-8">
             <div className="flex items-center gap-2 mb-4">
               <Icons.Users className="w-5 h-5 text-indigo-600" />
               <h3 className="text-lg font-bold text-gray-800">Contributeurs</h3>
-              <span className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-xs font-medium">
-                Union des étudiants de Massaguet
-              </span>
+              <span className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-xs font-medium">Union des étudiants de Massaguet</span>
             </div>
-
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100">
               <div className="flex flex-col md:flex-row items-center gap-6">
                 <div className="flex-shrink-0">
                   <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white shadow-lg bg-white flex items-center justify-center">
-                    <Image
-                      src="/team/union-logo.svg"
-                      alt="Union des étudiants de Massaguet"
-                      width={96}
-                      height={96}
-                      className="w-full h-full object-cover"
-                    />
+                    <Image src="/team/union-logo.svg" alt="Union" width={96} height={96} className="w-full h-full object-cover" />
                   </div>
                 </div>
-                
                 <div className="flex-1 text-center md:text-left">
                   <h4 className="text-xl font-bold text-gray-800">Union des étudiants de Massaguet</h4>
                   <p className="text-sm text-gray-600 leading-relaxed max-w-2xl">
-                    L'Union des étudiants de Massaguet est une association dédiée à la promotion de l'éducation 
-                    et du partage de connaissances. Ensemble, nous croyons que l'accès à l'information est un droit 
-                    fondamental et que la collaboration est la clé de la réussite éducative.
+                    Association dédiée à la promotion de l'éducation et du partage de connaissances.
+                    L'accès à l'information est un droit fondamental.
                   </p>
                   <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-4">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-sm text-gray-600 shadow-sm">
-                      <Icons.User className="w-4 h-4 text-indigo-500" />
-                      Étudiants
+                      <Icons.User className="w-4 h-4 text-indigo-500" /> Étudiants
                     </span>
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-sm text-gray-600 shadow-sm">
-                      <Icons.Book className="w-4 h-4 text-indigo-500" />
-                      Éducation
+                      <Icons.Book className="w-4 h-4 text-indigo-500" /> Éducation
                     </span>
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-sm text-gray-600 shadow-sm">
-                      <Icons.Star className="w-4 h-4 text-indigo-500" />
-                      Partage
+                      <Icons.Star className="w-4 h-4 text-indigo-500" /> Partage
                     </span>
                   </div>
                 </div>
               </div>
             </div>
-
             <div className="mt-4 p-4 bg-indigo-50 rounded-xl text-center border border-indigo-100">
               <p className="text-gray-700 text-sm flex items-center justify-center gap-2">
                 <Icons.Users className="w-5 h-5 text-indigo-600" />
-                <span className="font-medium">Rejoignez l'Union des étudiants de Massaguet !</span>
-                Contribuez à notre mission éducative en partageant vos documents.
+                <span className="font-medium">Rejoignez l'Union !</span>
+                Contribuez à notre mission éducative.
               </p>
-              <Link
-                href="/books/upload"
-                className="inline-block mt-3 bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm flex items-center gap-2 mx-auto"
-              >
-                <Icons.Upload className="w-4 h-4" />
-                Partager un document
+              <Link href="/books/upload" className="inline-block mt-3 bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm flex items-center gap-2 mx-auto">
+                <Icons.Upload className="w-4 h-4" /> Partager un document
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* === APPEL À L'ACTION === */}
+      {/* === CTA === */}
       <section className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-8 md:p-12 text-white text-center">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          Prêt à explorer ou partager ?
-        </h2>
+        <h2 className="text-3xl md:text-4xl font-bold mb-4">Prêt à explorer ou partager ?</h2>
         <p className="text-white/90 mb-6 max-w-2xl mx-auto">
           Rejoignez la communauté de Massaguet. Partagez vos documents, découvrez de nouvelles ressources
           et contribuez à l'éducation de tous.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
-          <Link
-            href="/books"
-            className="bg-white text-indigo-600 px-8 py-3.5 rounded-xl font-bold shadow-lg hover:shadow-2xl transition-all hover:scale-105 flex items-center gap-2"
-          >
-            <Icons.Book className="w-5 h-5" />
-            Explorer
+          <Link href="/books" className="bg-white text-indigo-600 px-8 py-3.5 rounded-xl font-bold shadow-lg hover:shadow-2xl transition-all hover:scale-105 flex items-center gap-2">
+            <Icons.Book className="w-5 h-5" /> Explorer
           </Link>
-          <Link
-            href="/login"
-            className="bg-white/10 backdrop-blur-sm border border-white/30 text-white px-8 py-3.5 rounded-xl font-medium hover:bg-white/20 transition-all flex items-center gap-2"
-          >
-            <Icons.Upload className="w-5 h-5" />
-            Partager
+          <Link href={user ? '/books/upload' : '/login'} className="bg-white/10 backdrop-blur-sm border border-white/30 text-white px-8 py-3.5 rounded-xl font-medium hover:bg-white/20 transition-all flex items-center gap-2">
+            <Icons.Upload className="w-5 h-5" /> {user ? 'Partager' : 'Se connecter'}
           </Link>
         </div>
       </section>
