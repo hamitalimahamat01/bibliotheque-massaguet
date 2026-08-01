@@ -18,52 +18,52 @@ const handler = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
-      console.log("🔄 signIn:", { provider: account?.provider, email: user?.email });
-      // Accepter la connexion
+    async signIn({ user, account }) {
+      console.log("🔄 signIn Google:", { provider: account?.provider, email: user?.email });
       return true;
     },
     async jwt({ token, user, account }) {
-      console.log("🔄 jwt:", { hasUser: !!user, provider: account?.provider });
       if (account?.provider === "google" && user) {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
         token.picture = user.image;
         token.provider = "google";
+        // Créer ou récupérer l'utilisateur dans votre backend
+        try {
+          const response = await fetch(`${process.env.NEXTAUTH_URL}/api/auth/google/callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: user.email,
+              name: user.name,
+              image: user.image,
+            }),
+          });
+          const data = await response.json();
+          if (data.user) {
+            token.id = data.user.id;
+            token.email = data.user.email;
+            token.name = data.user.name;
+          }
+        } catch (error) {
+          console.error('Erreur callback Google:', error);
+        }
       }
       return token;
     },
     async session({ session, token }) {
-      console.log("🔄 session:", { user: session?.user?.email });
       if (session.user) {
         session.user.id = token.id;
         session.user.name = token.name;
         session.user.email = token.email;
         session.user.image = token.picture;
-        session.user.provider = token.provider;
-        // Marquer que l'utilisateur est connecté
-        session.user.isAuthenticated = true;
+        session.user.provider = token.provider || "google";
       }
       return session;
     },
     async redirect({ url, baseUrl }) {
-      console.log("🔄 redirect:", { url, baseUrl });
-      // Rediriger vers la page de complétion de profil
-      // Si l'utilisateur vient de se connecter
-      if (url === '/profile') {
-        return `${baseUrl}/profile`;
-      }
-      // Si c'est une URL relative
-      if (url.startsWith('/')) {
-        return `${baseUrl}${url}`;
-      }
-      // Si c'est une URL absolue sur le même domaine
-      if (new URL(url).origin === baseUrl) {
-        return url;
-      }
-      // Par défaut, rediriger vers le dashboard
-      return `${baseUrl}/dashboard`;
+      return baseUrl + '/profile/complete';
     },
   },
   pages: {
@@ -75,7 +75,7 @@ const handler = NextAuth({
   debug: true,
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 jours
+    maxAge: 30 * 24 * 60 * 60,
   },
 });
 

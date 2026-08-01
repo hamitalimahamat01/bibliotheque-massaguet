@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn, useSession } from 'next-auth/react';
 import { Icons } from '@/components/Icons';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -10,55 +9,48 @@ import { useAuth } from '@/context/AuthContext';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [rememberMe, setRememberMe] = useState(false);
-  const { login, user } = useAuth();
-  const { data: session } = useSession();
+  const { user, login, register, googleLogin } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (user || session?.user) {
+    if (user) {
       router.push('/profile/complete');
     }
-  }, [user, session, router]);
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!email || !password) {
-      toast.error('Veuillez remplir tous les champs');
-      return;
-    }
-
     setLoading(true);
+
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.error || 'Email ou mot de passe incorrect');
-        return;
+      if (isLogin) {
+        if (!email || !password) {
+          toast.error('Veuillez remplir tous les champs');
+          setLoading(false);
+          return;
+        }
+        await login(email, password);
+      } else {
+        if (!name || !email || !password) {
+          toast.error('Veuillez remplir tous les champs');
+          setLoading(false);
+          return;
+        }
+        if (password.length < 6) {
+          toast.error('Le mot de passe doit contenir au moins 6 caractères');
+          setLoading(false);
+          return;
+        }
+        await register(name, email, password);
       }
-
-      localStorage.setItem('token', data.token);
-      if (rememberMe) {
-        localStorage.setItem('remember', 'true');
-      }
-      
-      await login(email, password);
-      toast.success('Connexion réussie !');
-      router.push('/profile/complete');
     } catch (error) {
-      console.error('Erreur de connexion:', error);
-      toast.error('Erreur lors de la connexion');
+      // L'erreur est déjà gérée par le contexte
     } finally {
       setLoading(false);
     }
@@ -67,29 +59,18 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
-      await signIn('google', {
-        callbackUrl: '/profile/complete',
-        redirect: true,
-      });
+      await googleLogin();
     } catch (error) {
       console.error('Erreur Google:', error);
-      toast.error('Erreur lors de la connexion avec Google');
+    } finally {
       setGoogleLoading(false);
     }
-  };
-
-  const handleForgotPassword = () => {
-    toast('Fonctionnalité à venir', {
-      icon: '🔜',
-      duration: 3000,
-    });
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       <div className="w-full max-w-md">
         <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-6 sm:p-8 border border-white/30 animate-slide-up">
-          {/* Logo et titre */}
           <div className="text-center mb-6">
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-indigo-500/30 mb-3">
               <Icons.Book className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
@@ -100,7 +81,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Formulaire */}
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {!isLogin && (
               <div>
@@ -111,9 +91,11 @@ export default function LoginPage() {
                   </div>
                   <input
                     type="text"
-                    name="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     placeholder="Votre nom"
                     className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm"
+                    required={!isLogin}
                   />
                 </div>
               </div>
@@ -188,7 +170,7 @@ export default function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={handleForgotPassword}
+                  onClick={() => toast.info('Fonctionnalité à venir')}
                   className="text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
                 >
                   Mot de passe oublié ?
@@ -207,7 +189,7 @@ export default function LoginPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Connexion...
+                  {isLogin ? 'Connexion...' : 'Inscription...'}
                 </>
               ) : (
                 isLogin ? 'Se connecter' : 'Créer un compte'
@@ -215,14 +197,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Séparateur */}
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-gray-200" />
             <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">ou</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
 
-          {/* Bouton Google */}
           <button
             onClick={handleGoogleLogin}
             disabled={googleLoading}
@@ -246,7 +226,6 @@ export default function LoginPage() {
             )}
           </button>
 
-          {/* Bas de page */}
           <div className="mt-5 text-center">
             <p className="text-sm text-gray-500">
               {isLogin ? "Pas encore de compte ?" : "Déjà un compte ?"}
@@ -260,7 +239,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Sécurisé */}
           <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
