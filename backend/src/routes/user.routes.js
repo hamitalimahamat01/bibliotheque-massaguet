@@ -3,8 +3,9 @@ const router = express.Router();
 const { authMiddleware, adminMiddleware } = require('../middlewares/auth.middleware');
 const prisma = require('../config/database');
 
-// Récupérer tous les utilisateurs (admin)
+// ===== GET ALL USERS =====
 router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
+  const startTime = Date.now();
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -22,20 +23,21 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    console.log(`👥 ${users.length} utilisateurs chargés en ${Date.now() - startTime}ms`);
     res.json({ success: true, users });
   } catch (error) {
-    console.error('Erreur récupération utilisateurs:', error);
-    res.status(500).json({ error: 'Erreur lors du chargement des utilisateurs' });
+    console.error('❌ Erreur users:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// Récupérer un utilisateur spécifique
+// ===== GET USER BY ID =====
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
 
     const user = await prisma.user.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
       select: {
         id: true,
         name: true,
@@ -61,18 +63,19 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
     res.json({ success: true, user });
   } catch (error) {
-    console.error('Erreur récupération utilisateur:', error);
-    res.status(500).json({ error: 'Erreur lors du chargement de l\'utilisateur' });
+    console.error('❌ Erreur get user:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// Activer/Désactiver un utilisateur (admin)
+// ===== TOGGLE USER STATUS =====
 router.patch('/:id/toggle', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
 
     const user = await prisma.user.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
+      select: { isActive: true }
     });
 
     if (!user) {
@@ -80,7 +83,7 @@ router.patch('/:id/toggle', authMiddleware, adminMiddleware, async (req, res) =>
     }
 
     const updated = await prisma.user.update({
-      where: { id },
+      where: { id: parseInt(id) },
       data: { isActive: !user.isActive },
       select: {
         id: true,
@@ -96,8 +99,8 @@ router.patch('/:id/toggle', authMiddleware, adminMiddleware, async (req, res) =>
       user: updated,
     });
   } catch (error) {
-    console.error('Erreur toggle utilisateur:', error);
-    res.status(500).json({ error: 'Erreur lors de la mise à jour' });
+    console.error('❌ Erreur toggle user:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

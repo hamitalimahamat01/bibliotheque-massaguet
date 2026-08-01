@@ -15,10 +15,10 @@ router.use('/categories', categoryRoutes);
 router.use('/users', userRoutes);
 router.use('/upload', uploadRoutes);
 
-// Route de test
+// Health check (très rapide)
 router.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'API Bibliothèque Massaguet',
     timestamp: new Date().toISOString(),
   });

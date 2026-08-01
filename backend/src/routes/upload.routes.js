@@ -1,68 +1,80 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middlewares/auth.middleware');
-const { uploadBook, handleUploadError } = require('../middlewares/upload.middleware');
-const { uploadBookToS3, uploadCoverToS3 } = require('../config/s3');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-// Upload d'un fichier unique
-router.post(
-  '/file',
-  authMiddleware,
-  uploadBook,
-  handleUploadError,
-  async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'Aucun fichier' });
-      }
-
-      const key = await uploadBookToS3(req.file);
-
-      res.json({
-        success: true,
-        message: 'Fichier uploadé',
-        file: {
-          key,
-          url: `/api/books/${key}`,
-          name: req.file.originalname,
-          size: req.file.size,
-          type: req.file.mimetype,
-        },
-      });
-    } catch (error) {
-      console.error('Erreur upload:', error);
-      res.status(500).json({ error: 'Erreur lors de l\'upload' });
+// Configuration Multer
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = './uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, unique + path.extname(file.originalname));
   }
-);
+});
 
-// Upload d'une image (couverture)
-router.post(
-  '/cover',
-  authMiddleware,
-  uploadBook,
-  handleUploadError,
-  async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'Aucune image' });
-      }
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
+    cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
+  }
+});
 
-      const key = await uploadCoverToS3(req.file);
-
-      res.json({
-        success: true,
-        message: 'Image uploadée',
-        cover: {
-          key,
-          url: `/api/books/cover/${key}`,
-        },
-      });
-    } catch (error) {
-      console.error('Erreur upload cover:', error);
-      res.status(500).json({ error: 'Erreur lors de l\'upload' });
+// ===== UPLOAD FILE =====
+router.post('/file', authMiddleware, upload.single('file'), async (req, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Aucun fichier' });
     }
+
+    console.log(`📤 Fichier uploadé en ${Date.now() - startTime}ms`);
+    res.json({
+      success: true,
+      message: 'Fichier uploadé',
+      file: {
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        size: req.file.size,
+        path: `/uploads/${req.file.filename}`,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Erreur upload:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
-);
+});
+
+// ===== UPLOAD COVER =====
+router.post('/cover', authMiddleware, upload.single('cover'), async (req, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Aucune image' });
+    }
+
+    console.log(`🖼️ Couverture uploadée en ${Date.now() - startTime}ms`);
+    res.json({
+      success: true,
+      message: 'Image uploadée',
+      cover: {
+        filename: req.file.filename,
+        path: `/uploads/${req.file.filename}`,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Erreur upload cover:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
 module.exports = router;
