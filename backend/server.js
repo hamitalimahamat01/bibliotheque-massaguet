@@ -14,7 +14,31 @@ const PORT = process.env.PORT || 5000;
 
 console.log('🚀 Démarrage du serveur...');
 
-// PostgreSQL Connection
+// ===== CONFIGURATION MULTER (AVANT LES ROUTES) =====
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = './uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, unique + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
+    cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
+  }
+});
+
+// ===== POSTGRESQL CONNECTION =====
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -23,7 +47,7 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
-// Configuration CORS
+// ===== CORS =====
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
@@ -73,7 +97,6 @@ app.get('/api/health', (req, res) => {
 
 // ===== AUTH ROUTES =====
 
-// Inscription
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -104,7 +127,6 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Connexion
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -135,7 +157,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Profil
 app.get('/api/auth/profile', auth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -152,7 +173,6 @@ app.get('/api/auth/profile', auth, async (req, res) => {
   }
 });
 
-// Mettre à jour le profil
 app.put('/api/auth/profile', auth, async (req, res) => {
   try {
     const { first_name, last_name, gender, city, birth_date, bio } = req.body;
@@ -172,7 +192,6 @@ app.put('/api/auth/profile', auth, async (req, res) => {
 
 // ===== BOOK ROUTES =====
 
-// Upload d'un livre
 app.post('/api/books', auth, upload.fields([
   { name: 'file', maxCount: 1 },
   { name: 'cover', maxCount: 1 }
@@ -220,7 +239,6 @@ app.post('/api/books', auth, upload.fields([
       ]
     );
 
-    // Incrémenter le compteur de documents
     await pool.query('UPDATE users SET documents_count = documents_count + 1 WHERE id = $1', [req.user.id]);
 
     console.log(`✅ Document créé en ${Date.now() - startTime}ms`);
@@ -240,7 +258,6 @@ app.post('/api/books', auth, upload.fields([
   }
 });
 
-// Liste des livres
 app.get('/api/books', async (req, res) => {
   try {
     const { category, search, limit = 12, page = 1, subCategory, subject, year } = req.query;
@@ -298,7 +315,6 @@ app.get('/api/books', async (req, res) => {
   }
 });
 
-// Détail d'un livre
 app.get('/api/books/:id', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM books WHERE id = $1', [req.params.id]);
@@ -312,7 +328,6 @@ app.get('/api/books/:id', async (req, res) => {
   }
 });
 
-// Téléchargement d'un livre
 app.get('/api/books/:id/download', async (req, res) => {
   try {
     const result = await pool.query('SELECT file_url, file_name FROM books WHERE id = $1', [req.params.id]);
@@ -406,30 +421,6 @@ const initDB = async () => {
     console.error('❌ Erreur création tables:', error);
   }
 };
-
-// Configuration Multer
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = './uploads';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, unique + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
-    cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
-  }
-});
 
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads', { recursive: true });
