@@ -30,7 +30,8 @@ export default function UploadBookPage() {
     year: '',
   });
 
-  // Timer pour chronométrer l'upload
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://bibliotheque-backend-wfkn.onrender.com/api';
+
   useEffect(() => {
     if (loading) {
       startTimeRef.current = Date.now();
@@ -52,7 +53,6 @@ export default function UploadBookPage() {
     };
   }, [loading]);
 
-  // Format du temps
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -62,7 +62,6 @@ export default function UploadBookPage() {
     return `${secs}s`;
   };
 
-  // Dropzone pour le fichier
   const onFileDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
@@ -94,7 +93,6 @@ export default function UploadBookPage() {
     },
   });
 
-  // Dropzone pour la couverture
   const onCoverDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
@@ -138,7 +136,6 @@ export default function UploadBookPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validations
     if (!file) {
       toast.error('Veuillez sélectionner un fichier');
       return;
@@ -146,11 +143,6 @@ export default function UploadBookPage() {
 
     if (!form.title.trim()) {
       toast.error('Le titre est requis');
-      return;
-    }
-
-    if (!form.author.trim()) {
-      toast.error('L\'auteur est requis');
       return;
     }
 
@@ -165,7 +157,7 @@ export default function UploadBookPage() {
       if (cover) formData.append('cover', cover);
       formData.append('title', form.title);
       formData.append('description', form.description || '');
-      formData.append('author', form.author);
+      formData.append('author', form.author || 'Anonyme');
       formData.append('category', form.category);
       formData.append('subCategory', form.subCategory || '');
       formData.append('subject', form.subject || '');
@@ -173,18 +165,13 @@ export default function UploadBookPage() {
 
       const token = localStorage.getItem('token');
       
-      // Simuler la progression avec un intervalle
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 95) {
-            clearInterval(progressInterval);
-            return 95;
-          }
-          return prev + 5;
-        });
-      }, 300);
+      if (!token) {
+        toast.error('Vous devez être connecté');
+        setLoading(false);
+        return;
+      }
 
-      const response = await fetch('/api/books', {
+      const response = await fetch(`${API_URL}/books`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -192,22 +179,23 @@ export default function UploadBookPage() {
         body: formData,
       });
 
-      clearInterval(progressInterval);
-      setUploadProgress(100);
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Réponse non-JSON:', text);
+        throw new Error('Le serveur a renvoyé une réponse invalide');
+      }
 
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.error || 'Erreur lors du partage');
-        setLoading(false);
-        return;
+        throw new Error(data.error || 'Erreur lors du partage');
       }
 
-      // Succès
+      setUploadProgress(100);
       setShowSuccess(true);
       toast.success('Document partagé avec succès !');
       
-      // Réinitialiser le formulaire après 3 secondes
       setTimeout(() => {
         setFile(null);
         setCover(null);
@@ -252,7 +240,6 @@ export default function UploadBookPage() {
 
   return (
     <div className="max-w-3xl mx-auto animate-fade-in">
-      {/* En-tête */}
       <div className="mb-8">
         <Link href="/books" className="text-gray-500 hover:text-gray-700 flex items-center gap-2 text-sm transition-colors">
           <Icons.ArrowLeft className="w-4 h-4" />
@@ -261,7 +248,6 @@ export default function UploadBookPage() {
       </div>
 
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-100/50">
-        {/* En-tête du formulaire */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
@@ -274,36 +260,16 @@ export default function UploadBookPage() {
           </div>
         </div>
 
-        {/* Contenu du formulaire */}
         {!showSuccess ? (
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Barre de progression et chronomètre */}
             {loading && (
               <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <svg className="w-16 h-16 transform -rotate-90">
-                        <circle
-                          cx="32"
-                          cy="32"
-                          r="28"
-                          fill="none"
-                          stroke="#e5e7eb"
-                          strokeWidth="4"
-                        />
-                        <circle
-                          cx="32"
-                          cy="32"
-                          r="28"
-                          fill="none"
-                          stroke="#4f46e5"
-                          strokeWidth="4"
-                          strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 28}`}
-                          strokeDashoffset={`${2 * Math.PI * 28 * (1 - uploadProgress / 100)}`}
-                          className="transition-all duration-300"
-                        />
+                        <circle cx="32" cy="32" r="28" fill="none" stroke="#e5e7eb" strokeWidth="4" />
+                        <circle cx="32" cy="32" r="28" fill="none" stroke="#4f46e5" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${2 * Math.PI * 28}`} strokeDashoffset={`${2 * Math.PI * 28 * (1 - uploadProgress / 100)}`} className="transition-all duration-300" />
                       </svg>
                       <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-indigo-600">
                         {uploadProgress}%
@@ -329,9 +295,7 @@ export default function UploadBookPage() {
               </div>
             )}
 
-            {/* Champs du formulaire */}
             <div className="space-y-4">
-              {/* Titre */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Titre du document <span className="text-red-500">*</span>
@@ -348,24 +312,19 @@ export default function UploadBookPage() {
                 />
               </div>
 
-              {/* Auteur */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Auteur <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Auteur</label>
                 <input
                   type="text"
                   name="author"
                   value={form.author}
                   onChange={handleChange}
-                  placeholder="Nom de l'auteur"
+                  placeholder="Nom de l'auteur (optionnel)"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                  required
                   disabled={loading}
                 />
               </div>
 
-              {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
@@ -379,7 +338,6 @@ export default function UploadBookPage() {
                 />
               </div>
 
-              {/* Catégorie et sous-catégorie */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
@@ -410,7 +368,6 @@ export default function UploadBookPage() {
                 </div>
               </div>
 
-              {/* Matière et année */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Matière</label>
@@ -438,7 +395,6 @@ export default function UploadBookPage() {
                 </div>
               </div>
 
-              {/* Fichier */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Fichier <span className="text-red-500">*</span>
@@ -488,7 +444,6 @@ export default function UploadBookPage() {
                 </div>
               </div>
 
-              {/* Couverture */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Photo de couverture</label>
                 <div
@@ -504,11 +459,7 @@ export default function UploadBookPage() {
                   <input {...getCoverInputProps()} />
                   {coverPreview ? (
                     <div className="relative inline-block">
-                      <img
-                        src={coverPreview}
-                        alt="Aperçu de la couverture"
-                        className="max-h-32 mx-auto rounded-lg object-contain"
-                      />
+                      <img src={coverPreview} alt="Aperçu" className="max-h-32 mx-auto rounded-lg object-contain" />
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleRemoveCover(); }}
@@ -533,7 +484,6 @@ export default function UploadBookPage() {
               </div>
             </div>
 
-            {/* Bouton de soumission */}
             <button
               type="submit"
               disabled={loading || !file}
@@ -556,7 +506,6 @@ export default function UploadBookPage() {
             </button>
           </form>
         ) : (
-          // Message de succès
           <div className="p-12 text-center animate-fade-in">
             <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -565,12 +514,8 @@ export default function UploadBookPage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Merci pour votre contribution !</h2>
             <p className="text-gray-500 mb-1">Votre document a été partagé avec succès.</p>
-            <p className="text-sm text-gray-400">
-              Vous contribuez à enrichir la bibliothèque de Massaguet.
-            </p>
-            <p className="text-xs text-gray-400 mt-4">
-              Redirection vers la bibliothèque dans quelques secondes...
-            </p>
+            <p className="text-sm text-gray-400">Vous contribuez à enrichir la bibliothèque de Massaguet.</p>
+            <p className="text-xs text-gray-400 mt-4">Redirection vers la bibliothèque dans quelques secondes...</p>
           </div>
         )}
       </div>

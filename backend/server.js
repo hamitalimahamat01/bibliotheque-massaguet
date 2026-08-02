@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 5000;
 
 console.log('🚀 Démarrage du serveur...');
 
-// ===== CONFIGURATION MULTER (AVANT LES ROUTES) =====
+// ===== CONFIGURATION MULTER =====
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = './uploads';
@@ -29,16 +29,19 @@ const storage = multer.diskStorage({
   }
 });
 
+const fileFilter = (req, file, cb) => {
+  const allowedExts = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
+  const ext = path.extname(file.originalname).toLowerCase();
+  cb(null, allowedExts.includes(ext));
+};
+
 const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
-    cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
-  }
+  fileFilter
 });
 
-// ===== POSTGRESQL CONNECTION =====
+// ===== POSTGRESQL =====
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -48,23 +51,13 @@ const pool = new Pool({
 });
 
 // ===== CORS =====
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://bibliotheque-frontend-ec0x.onrender.com',
-  'https://bibliotheque-frontend.onrender.com',
-];
-
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.log('❌ Origine bloquée par CORS:', origin);
-      callback(null, true);
-    }
-  },
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://bibliotheque-frontend-ec0x.onrender.com',
+    'https://bibliotheque-frontend.onrender.com'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
@@ -90,13 +83,14 @@ const auth = (req, res, next) => {
   }
 };
 
-// ===== HEALTH CHECK =====
+// ===== HEALTH =====
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'API Bibliothèque Massaguet' });
 });
 
-// ===== AUTH ROUTES =====
+// ===== AUTH =====
 
+// Register
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -123,14 +117,15 @@ app.post('/api/auth/register', async (req, res) => {
     res.status(201).json({ success: true, token, user });
   } catch (error) {
     console.error('❌ Erreur register:', error);
-    res.status(500).json({ error: 'Erreur lors de l\'inscription' });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
+// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log('🔐 Tentative de connexion:', email);
+    console.log('🔐 Connexion:', email);
 
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
@@ -153,10 +148,11 @@ app.post('/api/auth/login', async (req, res) => {
     res.json({ success: true, token, user });
   } catch (error) {
     console.error('❌ Erreur login:', error);
-    res.status(500).json({ error: 'Erreur lors de la connexion' });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
+// Profile
 app.get('/api/auth/profile', auth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -173,6 +169,7 @@ app.get('/api/auth/profile', auth, async (req, res) => {
   }
 });
 
+// Update Profile
 app.put('/api/auth/profile', auth, async (req, res) => {
   try {
     const { first_name, last_name, gender, city, birth_date, bio } = req.body;
@@ -190,13 +187,13 @@ app.put('/api/auth/profile', auth, async (req, res) => {
   }
 });
 
-// ===== BOOK ROUTES =====
+// ===== BOOKS =====
 
+// Upload - Auteur n'est plus obligatoire
 app.post('/api/books', auth, upload.fields([
   { name: 'file', maxCount: 1 },
   { name: 'cover', maxCount: 1 }
 ]), async (req, res) => {
-  const startTime = Date.now();
   try {
     const files = req.files;
     const file = files?.file?.[0] || null;
@@ -208,8 +205,8 @@ app.post('/api/books', auth, upload.fields([
 
     const { title, description, author, category, subCategory, subject, year } = req.body;
 
-    if (!title || !author) {
-      return res.status(400).json({ error: 'Titre et auteur requis' });
+    if (!title) {
+      return res.status(400).json({ error: 'Le titre est requis' });
     }
 
     const ext = path.extname(file.originalname).toLowerCase();
@@ -231,7 +228,7 @@ app.post('/api/books', auth, upload.fields([
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id, title, author, file_url, cover_url`,
       [
-        title, description || '', author, category || 'general', 
+        title, description || '', author || 'Anonyme', category || 'general', 
         subCategory || '', subject || '',
         fileType, `/uploads/${file.filename}`, file.filename,
         file.originalname, file.size,
@@ -241,26 +238,28 @@ app.post('/api/books', auth, upload.fields([
 
     await pool.query('UPDATE users SET documents_count = documents_count + 1 WHERE id = $1', [req.user.id]);
 
-    console.log(`✅ Document créé en ${Date.now() - startTime}ms`);
     res.status(201).json({
       success: true,
       message: 'Document partagé avec succès',
       book: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ Erreur create book:', error);
-    ['file', 'cover'].forEach(key => {
-      if (req.files?.[key]?.[0]?.path) {
-        try { fs.unlinkSync(req.files[key][0].path); } catch(e) {}
-      }
-    });
+    console.error('❌ Erreur upload:', error);
+    if (req.files) {
+      ['file', 'cover'].forEach(key => {
+        if (req.files[key]?.[0]?.path && fs.existsSync(req.files[key][0].path)) {
+          try { fs.unlinkSync(req.files[key][0].path); } catch(e) {}
+        }
+      });
+    }
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
+// Get all books
 app.get('/api/books', async (req, res) => {
   try {
-    const { category, search, limit = 12, page = 1, subCategory, subject, year } = req.query;
+    const { category, search, limit = 12, page = 1 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
     let query = 'SELECT * FROM books WHERE is_published = 1';
@@ -272,21 +271,7 @@ app.get('/api/books', async (req, res) => {
       params.push(category);
       paramCount++;
     }
-    if (subCategory) {
-      query += ` AND sub_category = $${paramCount}`;
-      params.push(subCategory);
-      paramCount++;
-    }
-    if (subject) {
-      query += ` AND subject ILIKE $${paramCount}`;
-      params.push(`%${subject}%`);
-      paramCount++;
-    }
-    if (year) {
-      query += ` AND year = $${paramCount}`;
-      params.push(year);
-      paramCount++;
-    }
+
     if (search) {
       query += ` AND (title ILIKE $${paramCount} OR author ILIKE $${paramCount})`;
       params.push(`%${search}%`);
@@ -315,6 +300,7 @@ app.get('/api/books', async (req, res) => {
   }
 });
 
+// Get book by ID
 app.get('/api/books/:id', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM books WHERE id = $1', [req.params.id]);
@@ -328,6 +314,7 @@ app.get('/api/books/:id', async (req, res) => {
   }
 });
 
+// Download book
 app.get('/api/books/:id/download', async (req, res) => {
   try {
     const result = await pool.query('SELECT file_url, file_name FROM books WHERE id = $1', [req.params.id]);
@@ -349,24 +336,19 @@ app.get('/api/books/:id/download', async (req, res) => {
 });
 
 // ===== CATEGORIES =====
-app.get('/api/categories', async (req, res) => {
-  try {
-    const categories = [
-      { id: '1', name: 'Mathématiques' },
-      { id: '2', name: 'Physique' },
-      { id: '3', name: 'Chimie' },
-      { id: '4', name: 'Anglais' },
-      { id: '5', name: 'Philosophie' },
-      { id: '6', name: 'Histoire' },
-    ];
-    res.json({ success: true, categories });
-  } catch (error) {
-    console.error('❌ Erreur categories:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
+app.get('/api/categories', (req, res) => {
+  const categories = [
+    { id: '1', name: 'Mathématiques' },
+    { id: '2', name: 'Physique' },
+    { id: '3', name: 'Chimie' },
+    { id: '4', name: 'Anglais' },
+    { id: '5', name: 'Philosophie' },
+    { id: '6', name: 'Histoire' },
+  ];
+  res.json({ success: true, categories });
 });
 
-// ===== INIT =====
+// ===== INIT DB =====
 const initDB = async () => {
   try {
     await pool.query(`
@@ -389,14 +371,14 @@ const initDB = async () => {
         last_login TIMESTAMP
       )
     `);
-    console.log('✅ Table users vérifiée');
+    console.log('✅ Table users prête');
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS books (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         description TEXT,
-        author VARCHAR(100) NOT NULL,
+        author VARCHAR(100) DEFAULT 'Anonyme',
         category VARCHAR(20) DEFAULT 'general',
         sub_category VARCHAR(20) DEFAULT '',
         subject VARCHAR(100),
@@ -416,12 +398,13 @@ const initDB = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
-    console.log('✅ Table books vérifiée');
+    console.log('✅ Table books prête');
   } catch (error) {
-    console.error('❌ Erreur création tables:', error);
+    console.error('❌ Erreur init DB:', error);
   }
 };
 
+// ===== START =====
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads', { recursive: true });
 }
@@ -430,6 +413,5 @@ initDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur: http://0.0.0.0:${PORT}`);
     console.log('📊 Base de données: PostgreSQL (Neon)');
-    console.log('📁 Uploads: ./uploads');
   });
 });
