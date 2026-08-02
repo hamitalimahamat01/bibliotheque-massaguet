@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { booksApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { Icons } from '@/components/Icons';
@@ -21,6 +22,7 @@ interface Book {
   coverUrl: string;
   year?: string;
   subject?: string;
+  uploadedBy?: { name: string };
 }
 
 export default function BooksPage() {
@@ -49,15 +51,21 @@ export default function BooksPage() {
       if (search) params.search = search;
 
       const res: any = await booksApi.getAll(params);
-      setBooks(res.data.books || []);
-      setPagination({
-        ...pagination,
-        total: res.data.pagination?.total || 0,
-        pages: res.data.pagination?.pages || 0,
-      });
+      
+      if (res.data && res.data.books) {
+        setBooks(res.data.books);
+        setPagination({
+          ...pagination,
+          total: res.data.pagination?.total || 0,
+          pages: res.data.pagination?.pages || 0,
+        });
+      } else {
+        setBooks([]);
+      }
     } catch (error) {
       console.error('Erreur chargement livres:', error);
       toast.error('Erreur lors du chargement des livres');
+      setBooks([]);
     } finally {
       setLoading(false);
     }
@@ -85,7 +93,7 @@ export default function BooksPage() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="card-modern h-80 shimmer" />
+            <div key={i} className="bg-white rounded-2xl shadow-sm h-80 shimmer" />
           ))}
         </div>
       ) : books.length > 0 ? (
@@ -145,5 +153,3 @@ export default function BooksPage() {
     </div>
   );
 }
-
-import Link from 'next/link';

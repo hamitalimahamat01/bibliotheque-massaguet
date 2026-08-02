@@ -19,6 +19,7 @@ interface BookCardProps {
     coverUrl: string;
     year?: string;
     subject?: string;
+    uploadedBy?: { name: string };
   };
 }
 
@@ -57,7 +58,7 @@ export default function BookCard({ book }: BookCardProps) {
 
   return (
     <Link href={`/books/${book.id}`} className="block group">
-      <div className="card-modern h-full flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100/50 h-full flex flex-col">
         {/* Cover */}
         <div className="relative h-48 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center overflow-hidden">
           {book.coverUrl ? (
@@ -72,7 +73,7 @@ export default function BookCard({ book }: BookCardProps) {
                 {getFileIcon()}
               </div>
               <span className={`text-xs font-medium px-3 py-1 rounded-full ${getFileColor()}`}>
-                {book.fileType.toUpperCase()}
+                {book.fileType ? book.fileType.toUpperCase() : 'PDF'}
               </span>
             </div>
           )}
@@ -103,7 +104,9 @@ export default function BookCard({ book }: BookCardProps) {
           <h3 className="font-semibold text-gray-800 text-lg mb-1 line-clamp-1 group-hover:text-indigo-600 transition-colors">
             {book.title}
           </h3>
-          <p className="text-sm text-gray-500 mb-2">par {book.author}</p>
+          <p className="text-sm text-gray-500 mb-2">
+            {book.author || book.uploadedBy?.name || 'Anonyme'}
+          </p>
           {book.description && (
             <p className="text-sm text-gray-600 line-clamp-2 mb-3 flex-1">
               {book.description}
@@ -121,7 +124,7 @@ export default function BookCard({ book }: BookCardProps) {
               {book.views || 0}
             </span>
             <span className="text-xs">
-              {format(new Date(book.createdAt), 'dd MMM yyyy', { locale: fr })}
+              {book.createdAt ? format(new Date(book.createdAt), 'dd MMM yyyy', { locale: fr }) : ''}
             </span>
           </div>
         </div>
