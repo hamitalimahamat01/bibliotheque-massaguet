@@ -30,13 +30,15 @@ const upload = multer({
   }
 });
 
-// ===== UPLOAD BOOK =====
+// ===== POST /api/books - Upload d'un livre =====
 router.post('/', authMiddleware, upload.fields([
   { name: 'file', maxCount: 1 },
   { name: 'cover', maxCount: 1 }
 ]), async (req, res) => {
   const startTime = Date.now();
   try {
+    console.log('📤 Upload reçu');
+    
     const files = req.files;
     const file = files?.file?.[0] || null;
     const cover = files?.cover?.[0] || null;
@@ -51,7 +53,6 @@ router.post('/', authMiddleware, upload.fields([
       return res.status(400).json({ error: 'Titre et auteur requis' });
     }
 
-    // Déterminer le type de fichier
     const ext = path.extname(file.originalname).toLowerCase();
     const fileTypeMap = {
       '.pdf': 'pdf',
@@ -63,7 +64,6 @@ router.post('/', authMiddleware, upload.fields([
 
     const coverUrl = cover ? `/uploads/${cover.filename}` : null;
 
-    // Créer le document dans la base de données
     const book = await prisma.book.create({
       data: {
         title,
@@ -83,23 +83,15 @@ router.post('/', authMiddleware, upload.fields([
         uploadedById: req.user.id,
         uploadedByName: req.user.name || 'Anonyme',
       },
-      select: {
-        id: true,
-        title: true,
-        author: true,
-        fileUrl: true,
-        coverUrl: true,
-        createdAt: true,
-      }
     });
 
-    // Incrémenter le compteur de documents de l'utilisateur
+    // Incrémenter le compteur de documents
     await prisma.user.update({
       where: { id: req.user.id },
       data: { documentsCount: { increment: 1 } },
     });
 
-    console.log(`✅ Document ${book.id} créé en ${Date.now() - startTime}ms`);
+    console.log(`✅ Document créé en ${Date.now() - startTime}ms`);
     res.status(201).json({
       success: true,
       message: 'Document partagé avec succès',
@@ -107,7 +99,6 @@ router.post('/', authMiddleware, upload.fields([
     });
   } catch (error) {
     console.error('❌ Erreur create book:', error);
-    // Nettoyer les fichiers en cas d'erreur
     ['file', 'cover'].forEach(key => {
       if (req.files?.[key]?.[0]?.path) {
         try { fs.unlinkSync(req.files[key][0].path); } catch(e) {}
@@ -117,7 +108,7 @@ router.post('/', authMiddleware, upload.fields([
   }
 });
 
-// ===== GET BOOKS =====
+// ===== GET /api/books - Liste des livres =====
 router.get('/', async (req, res) => {
   try {
     const { category, search, limit = 12, page = 1, subCategory, subject, year } = req.query;
@@ -143,25 +134,6 @@ router.get('/', async (req, res) => {
         skip: offset,
         take: parseInt(limit),
         orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          author: true,
-          category: true,
-          subCategory: true,
-          subject: true,
-          fileType: true,
-          fileUrl: true,
-          coverUrl: true,
-          downloads: true,
-          views: true,
-          createdAt: true,
-          year: true,
-          uploadedBy: {
-            select: { id: true, name: true }
-          }
-        }
       }),
       prisma.book.count({ where })
     ]);
@@ -182,16 +154,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ===== GET BOOK BY ID =====
+// ===== GET /api/books/:id - Détail d'un livre =====
 router.get('/:id', async (req, res) => {
   try {
     const book = await prisma.book.findUnique({
       where: { id: parseInt(req.params.id) },
-      include: {
-        uploadedBy: {
-          select: { id: true, name: true, email: true },
-        },
-      },
     });
 
     if (!book) {
@@ -205,7 +172,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ===== DOWNLOAD BOOK =====
+// ===== GET /api/books/:id/download - Téléchargement =====
 router.get('/:id/download', async (req, res) => {
   try {
     const book = await prisma.book.findUnique({
