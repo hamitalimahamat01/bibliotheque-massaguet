@@ -415,4 +415,3 @@ initDB().then(() => {
     console.log('📊 Base de données: PostgreSQL (Neon)');
   });
 });
-# Force rebuild
