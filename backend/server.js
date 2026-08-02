@@ -189,7 +189,7 @@ app.put('/api/auth/profile', auth, async (req, res) => {
 
 // ===== BOOKS =====
 
-// Upload - Auteur n'est plus obligatoire
+// Upload
 app.post('/api/books', auth, upload.fields([
   { name: 'file', maxCount: 1 },
   { name: 'cover', maxCount: 1 }
@@ -256,13 +256,13 @@ app.post('/api/books', auth, upload.fields([
   }
 });
 
-// Get all books
+// Get all books - CORRIGÉ
 app.get('/api/books', async (req, res) => {
   try {
     const { category, search, limit = 12, page = 1 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
-    let query = 'SELECT * FROM books WHERE is_published = 1';
+    let query = 'SELECT * FROM books WHERE is_published = true';  // ← CORRECTION: true au lieu de 1
     const params = [];
     let paramCount = 1;
 
@@ -282,7 +282,7 @@ app.get('/api/books', async (req, res) => {
     params.push(parseInt(limit), offset);
 
     const books = await pool.query(query, params);
-    const total = await pool.query('SELECT COUNT(*) as count FROM books WHERE is_published = 1');
+    const total = await pool.query('SELECT COUNT(*) as count FROM books WHERE is_published = true');
 
     res.json({
       success: true,
