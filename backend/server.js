@@ -7,67 +7,37 @@ const dotenv = require('dotenv');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { storage } = require('./src/config/cloudinary');
 
 dotenv.config();
-const app = express();  // ✅ app est déclarée ici
+const app = express();
 const PORT = process.env.PORT || 5000;
 
 console.log('🚀 Démarrage du serveur...');
 
-// ===== CONFIGURATION MULTER =====
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = './uploads';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, unique + path.extname(file.originalname));
-  }
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedExts = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
-  const ext = path.extname(file.originalname).toLowerCase();
-  cb(null, allowedExts.includes(ext));
-};
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 },
-  fileFilter
-});
-
-// ===== POSTGRESQL =====
+// PostgreSQL Connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  ssl: { rejectUnauthorized: false }
 });
 
-// ===== CORS =====
+// ===== MIDDLEWARE =====
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'http://localhost:3001',
     'https://bibliotheque-frontend-ec0x.onrender.com',
     'https://bibliotheque-frontend.onrender.com'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
 }));
-
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// ✅ Servir les fichiers statiques
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// ===== CONFIGURATION MULTER AVEC CLOUDINARY =====
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
 
 // ===== AUTH MIDDLEWARE =====
 const auth = (req, res, next) => {
@@ -85,108 +55,76 @@ const auth = (req, res, next) => {
   }
 };
 
-// ===== HEALTH =====
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'API Bibliothèque Massaguet' });
+// ===== HEALTH CHECK =====
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ 
+      status: 'OK', 
+      message: 'API Bibliothèque Massaguet (PostgreSQL + Cloudinary)',
+      database: '✅ Connecté à Neon',
+      storage: '✅ Cloudinary'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'ERROR', 
+      message: 'Erreur de connexion à la base de données'
+    });
+  }
 });
 
-// ===== AUTH =====
-
+// ===== AUTH ROUTES =====
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    console.log('📝 Inscription:', email);
-
     const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: 'Cet email est déjà utilisé' });
     }
-
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await pool.query(
       'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
       [name, email, hashedPassword, 'USER']
     );
-
     const user = result.rows[0];
     const token = jwt.sign(
       { id: user.id, email: user.email },
       process.env.JWT_SECRET || 'secret',
       { expiresIn: '7d' }
     );
-
-    res.status(201).json({ success: true, token, user });
+    res.json({ success: true, token, user });
   } catch (error) {
     console.error('❌ Erreur register:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur lors de l\'inscription' });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log('🔐 Connexion:', email);
-
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
-
     const user = result.rows[0];
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) {
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
-
     const token = jwt.sign(
       { id: user.id, email: user.email },
       process.env.JWT_SECRET || 'secret',
       { expiresIn: '7d' }
     );
-
     delete user.password;
     res.json({ success: true, token, user });
   } catch (error) {
     console.error('❌ Erreur login:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur lors de la connexion' });
   }
 });
 
-app.get('/api/auth/profile', auth, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, name, email, role, bio, avatar, first_name, last_name, gender, city, birth_date, documents_count FROM users WHERE id = $1',
-      [req.user.id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Utilisateur non trouvé' });
-    }
-    res.json({ success: true, user: result.rows[0] });
-  } catch (error) {
-    console.error('❌ Erreur profile:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-app.put('/api/auth/profile', auth, async (req, res) => {
-  try {
-    const { first_name, last_name, gender, city, birth_date, bio } = req.body;
-    const result = await pool.query(
-      `UPDATE users 
-       SET first_name = $1, last_name = $2, gender = $3, city = $4, birth_date = $5, bio = $6
-       WHERE id = $7 
-       RETURNING id, name, email, role, bio, first_name, last_name, gender, city, birth_date, documents_count`,
-      [first_name, last_name, gender, city, birth_date, bio, req.user.id]
-    );
-    res.json({ success: true, user: result.rows[0] });
-  } catch (error) {
-    console.error('❌ Erreur update profile:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// ===== BOOKS =====
-
+// ===== BOOKS ROUTES =====
 app.post('/api/books', auth, upload.fields([
   { name: 'file', maxCount: 1 },
   { name: 'cover', maxCount: 1 }
@@ -206,6 +144,10 @@ app.post('/api/books', auth, upload.fields([
       return res.status(400).json({ error: 'Le titre est requis' });
     }
 
+    // URL Cloudinary
+    const fileUrl = file.path; // URL Cloudinary
+    const coverUrl = cover ? cover.path : null;
+
     const ext = path.extname(file.originalname).toLowerCase();
     const fileTypeMap = {
       '.pdf': 'pdf',
@@ -214,8 +156,6 @@ app.post('/api/books', auth, upload.fields([
       '.pptx': 'ppt'
     };
     const fileType = fileTypeMap[ext] || 'pdf';
-
-    const coverUrl = cover ? `/uploads/${cover.filename}` : null;
 
     const result = await pool.query(
       `INSERT INTO books 
@@ -227,7 +167,7 @@ app.post('/api/books', auth, upload.fields([
       [
         title, description || '', author || 'Anonyme', category || 'general', 
         subCategory || '', subject || '',
-        fileType, `/uploads/${file.filename}`, file.filename,
+        fileType, fileUrl, file.filename,
         file.originalname, file.size,
         coverUrl, req.user.id, req.user.name || 'Anonyme', year || ''
       ]
@@ -235,6 +175,7 @@ app.post('/api/books', auth, upload.fields([
 
     await pool.query('UPDATE users SET documents_count = documents_count + 1 WHERE id = $1', [req.user.id]);
 
+    console.log('✅ Document créé avec Cloudinary:', result.rows[0].id);
     res.status(201).json({
       success: true,
       message: 'Document partagé avec succès',
@@ -242,14 +183,7 @@ app.post('/api/books', auth, upload.fields([
     });
   } catch (error) {
     console.error('❌ Erreur upload:', error);
-    if (req.files) {
-      ['file', 'cover'].forEach(key => {
-        if (req.files[key]?.[0]?.path && fs.existsSync(req.files[key][0].path)) {
-          try { fs.unlinkSync(req.files[key][0].path); } catch(e) {}
-        }
-      });
-    }
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur serveur: ' + error.message });
   }
 });
 
@@ -326,12 +260,9 @@ app.get('/api/books/:id/download', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Document non trouvé' });
     }
-    const filePath = path.join(__dirname, result.rows[0].file_url);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Fichier introuvable' });
-    }
     await pool.query('UPDATE books SET downloads = downloads + 1 WHERE id = $1', [req.params.id]);
-    res.download(filePath, result.rows[0].file_name);
+    // Rediriger vers l'URL Cloudinary
+    res.redirect(result.rows[0].file_url);
   } catch (error) {
     console.error('❌ Erreur download:', error);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -410,13 +341,10 @@ const initDB = async () => {
 };
 
 // ===== START =====
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads', { recursive: true });
-}
-
 initDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur: http://0.0.0.0:${PORT}`);
     console.log('📊 Base de données: PostgreSQL (Neon)');
+    console.log('☁️  Stockage: Cloudinary');
   });
 });
