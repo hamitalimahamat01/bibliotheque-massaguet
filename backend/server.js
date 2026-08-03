@@ -1,19 +1,29 @@
+// 1. CHARGER DOTENV EN PREMIER
+const dotenv = require('dotenv');
+dotenv.config();
+
+// 2. MAINTENANT charger les autres modules
 const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { storage } = require('./src/config/cloudinary');
 
-dotenv.config();
+// 3. MAINTENANT charger Cloudinary (les variables sont disponibles)
+const { storage, cloudinary } = require('./src/config/cloudinary');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 console.log('🚀 Démarrage du serveur...');
+console.log('☁️ Cloudinary configuré avec:', {
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? '✅' : '❌',
+  api_key: process.env.CLOUDINARY_API_KEY ? '✅' : '❌',
+  api_secret: process.env.CLOUDINARY_API_SECRET ? '✅' : '❌',
+});
 
 // PostgreSQL Connection
 const pool = new Pool({
@@ -26,7 +36,8 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'https://bibliotheque-frontend-ec0x.onrender.com',
-    'https://bibliotheque-frontend.onrender.com'
+    'https://bibliotheque-frontend.onrender.com',
+    '*'
   ],
   credentials: true,
 }));
@@ -36,7 +47,10 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // ===== CONFIGURATION MULTER AVEC CLOUDINARY =====
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { 
+    fileSize: 50 * 1024 * 1024,
+    files: 2
+  },
 });
 
 // ===== AUTH MIDDLEWARE =====
@@ -63,7 +77,11 @@ app.get('/api/health', async (req, res) => {
       status: 'OK', 
       message: 'API Bibliothèque Massaguet (PostgreSQL + Cloudinary)',
       database: '✅ Connecté à Neon',
-      storage: '✅ Cloudinary'
+      storage: '✅ Cloudinary',
+      cloudinary: {
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'non défini',
+        configured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
+      }
     });
   } catch (error) {
     res.status(500).json({ 
@@ -130,6 +148,9 @@ app.post('/api/books', auth, upload.fields([
   { name: 'cover', maxCount: 1 }
 ]), async (req, res) => {
   try {
+    console.log('📤 Upload reçu');
+    console.log('Fichiers reçus:', req.files ? Object.keys(req.files) : 'Aucun');
+    
     const files = req.files;
     const file = files?.file?.[0] || null;
     const cover = files?.cover?.[0] || null;
@@ -145,8 +166,11 @@ app.post('/api/books', auth, upload.fields([
     }
 
     // URL Cloudinary
-    const fileUrl = file.path; // URL Cloudinary
+    const fileUrl = file.path;
     const coverUrl = cover ? cover.path : null;
+
+    console.log('📄 Fichier Cloudinary URL:', fileUrl);
+    console.log('🖼️ Couverture Cloudinary URL:', coverUrl);
 
     const ext = path.extname(file.originalname).toLowerCase();
     const fileTypeMap = {
@@ -261,7 +285,6 @@ app.get('/api/books/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'Document non trouvé' });
     }
     await pool.query('UPDATE books SET downloads = downloads + 1 WHERE id = $1', [req.params.id]);
-    // Rediriger vers l'URL Cloudinary
     res.redirect(result.rows[0].file_url);
   } catch (error) {
     console.error('❌ Erreur download:', error);
@@ -346,5 +369,6 @@ initDB().then(() => {
     console.log(`🚀 Serveur: http://0.0.0.0:${PORT}`);
     console.log('📊 Base de données: PostgreSQL (Neon)');
     console.log('☁️  Stockage: Cloudinary');
+    console.log('☁️ Cloudinary cloud_name:', process.env.CLOUDINARY_CLOUD_NAME);
   });
 });
