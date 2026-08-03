@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { booksApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { Icons } from '@/components/Icons';
-import { getImageUrl } from '@/lib/optimize';
+import { getImageUrl, formatFileSize } from '@/lib/optimize';
 import toast from 'react-hot-toast';
 
 interface Book {
@@ -35,6 +35,7 @@ export default function BookDetailPage() {
   const { user } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     loadBook();
@@ -56,17 +57,26 @@ export default function BookDetailPage() {
 
   const handleDownload = async () => {
     if (!book) return;
+    
+    setDownloading(true);
     try {
       const res: any = await booksApi.download(book.id);
-      if (res.data.downloadUrl) {
+      
+      // La réponse peut être une redirection ou une URL
+      if (res.data?.downloadUrl) {
         window.open(res.data.downloadUrl, '_blank');
-        toast.success('Téléchargement démarré');
-      } else {
+        toast.success('Téléchargement démarré !');
+      } else if (book.fileUrl) {
         window.open(book.fileUrl, '_blank');
-        toast.success('Téléchargement démarré');
+        toast.success('Téléchargement démarré !');
+      } else {
+        toast.error('URL de téléchargement non disponible');
       }
     } catch (error) {
+      console.error('Erreur téléchargement:', error);
       toast.error('Erreur lors du téléchargement');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -81,8 +91,13 @@ export default function BookDetailPage() {
   if (!book) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-600">Livre non trouvé</h2>
-        <Link href="/books" className="text-indigo-600 hover:underline mt-4 inline-block">
+        <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Icons.Book className="w-10 h-10 text-gray-400" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-600 mb-2">Document non trouvé</h2>
+        <p className="text-gray-400 mb-6">Le document que vous recherchez n'existe pas ou a été supprimé.</p>
+        <Link href="/books" className="btn-primary inline-flex items-center gap-2">
+          <Icons.ArrowLeft className="w-4 h-4" />
           Retour à la bibliothèque
         </Link>
       </div>
@@ -102,22 +117,43 @@ export default function BookDetailPage() {
     return icons[book.fileType] || '📄';
   };
 
-  return (
-    <div className="animate-fade-in">
-      <Link href="/books" className="text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-2 mb-6">
-        <Icons.ArrowLeft className="w-5 h-5" />
-        Retour à la bibliothèque
-      </Link>
+  const getFileTypeLabel = () => {
+    const labels: Record<string, string> = {
+      pdf: 'PDF',
+      docx: 'Word',
+      ppt: 'PowerPoint',
+      pptx: 'PowerPoint',
+    };
+    return labels[book.fileType] || book.fileType.toUpperCase();
+  };
 
-      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-        <div className="grid md:grid-cols-3 gap-8 p-8">
-          <div className="md:col-span-1">
-            <div className="aspect-[3/4] rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex flex-col items-center justify-center p-6 overflow-hidden">
+  const formattedDate = new Date(book.createdAt).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  return (
+    <div className="animate-fade-in max-w-5xl mx-auto">
+      {/* Fil d'Ariane */}
+      <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+        <Link href="/" className="hover:text-indigo-600 transition-colors">Accueil</Link>
+        <Icons.ChevronRight className="w-4 h-4" />
+        <Link href="/books" className="hover:text-indigo-600 transition-colors">Bibliothèque</Link>
+        <Icons.ChevronRight className="w-4 h-4" />
+        <span className="text-gray-700 font-medium truncate max-w-[200px]">{book.title}</span>
+      </nav>
+
+      <div className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-100/50">
+        <div className="grid md:grid-cols-3 gap-0">
+          {/* Section Couverture */}
+          <div className="md:col-span-1 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-8 flex items-center justify-center">
+            <div className="aspect-[3/4] w-full max-w-sm rounded-2xl bg-white shadow-lg overflow-hidden flex items-center justify-center relative">
               {hasCover ? (
                 <img
                   src={coverImageUrl}
                   alt={book.title}
-                  className="w-full h-full object-cover rounded-lg"
+                  className="w-full h-full object-cover"
                   crossOrigin="anonymous"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -125,75 +161,135 @@ export default function BookDetailPage() {
                     const parent = target.parentElement;
                     if (parent) {
                       parent.innerHTML = `
-                        <span class="text-7xl mb-4">${getFileIcon()}</span>
-                        <span class="text-sm font-bold px-4 py-2 rounded-full bg-white/80 text-gray-700">
-                          ${book.fileType.toUpperCase()}
-                        </span>
+                        <div class="flex flex-col items-center justify-center p-6 text-center">
+                          <span class="text-6xl mb-4">${getFileIcon()}</span>
+                          <span class="text-sm font-bold px-4 py-2 rounded-full bg-indigo-100 text-indigo-700">
+                            ${getFileTypeLabel()}
+                          </span>
+                        </div>
                       `;
                     }
                   }}
                 />
               ) : (
-                <>
-                  <span className="text-7xl mb-4">{getFileIcon()}</span>
-                  <span className="text-sm font-bold px-4 py-2 rounded-full bg-white/80 text-gray-700">
-                    {book.fileType.toUpperCase()}
+                <div className="flex flex-col items-center justify-center p-6 text-center">
+                  <span className="text-6xl mb-4">{getFileIcon()}</span>
+                  <span className="text-sm font-bold px-4 py-2 rounded-full bg-indigo-100 text-indigo-700">
+                    {getFileTypeLabel()}
                   </span>
-                </>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="md:col-span-2">
-            <h1 className="text-3xl font-bold text-gray-800">{book.title}</h1>
-            <p className="text-gray-500 mt-1">par {book.author}</p>
-
-            {book.description && (
-              <p className="text-gray-600 my-4 leading-relaxed">{book.description}</p>
-            )}
-
-            <div className="grid grid-cols-2 gap-3 text-sm my-4">
-              {book.category && (
-                <div>
-                  <span className="text-gray-500">Catégorie</span>
-                  <p className="font-medium capitalize">{book.category}</p>
-                </div>
-              )}
-              {book.subCategory && (
-                <div>
-                  <span className="text-gray-500">Sous-catégorie</span>
-                  <p className="font-medium uppercase">{book.subCategory}</p>
-                </div>
-              )}
-              {book.subject && (
-                <div>
-                  <span className="text-gray-500">Matière</span>
-                  <p className="font-medium">{book.subject}</p>
-                </div>
-              )}
-              {book.year && (
-                <div>
-                  <span className="text-gray-500">Année</span>
-                  <p className="font-medium">{book.year}</p>
-                </div>
-              )}
+          {/* Section Détails */}
+          <div className="md:col-span-2 p-8 md:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
               <div>
-                <span className="text-gray-500">Téléchargements</span>
-                <p className="font-medium">{book.downloads || 0}</p>
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-800 leading-tight">
+                  {book.title}
+                </h1>
+                <p className="text-gray-500 mt-2 flex items-center gap-2">
+                  <Icons.User className="w-4 h-4" />
+                  par <span className="font-medium text-gray-700">{book.author}</span>
+                </p>
               </div>
-              <div>
-                <span className="text-gray-500">Vues</span>
-                <p className="font-medium">{book.views || 0}</p>
+              <div className="flex items-center gap-2">
+                <span className="badge bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                  {book.category === 'prepa' ? 'Prépa' : 'Général'}
+                </span>
+                {book.subCategory && (
+                  <span className="badge bg-green-100 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium uppercase">
+                    {book.subCategory}
+                  </span>
+                )}
               </div>
             </div>
 
+            {book.description && (
+              <div className="bg-gray-50 rounded-xl p-5 my-6">
+                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Description</h3>
+                <p className="text-gray-700 leading-relaxed">{book.description}</p>
+              </div>
+            )}
+
+            {/* Métadonnées */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
+              {book.subject && (
+                <div className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-xs text-gray-400 uppercase">Matière</p>
+                  <p className="font-medium text-gray-700">{book.subject}</p>
+                </div>
+              )}
+              {book.year && (
+                <div className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-xs text-gray-400 uppercase">Année</p>
+                  <p className="font-medium text-gray-700">{book.year}</p>
+                </div>
+              )}
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-xs text-gray-400 uppercase">Téléchargements</p>
+                <p className="font-medium text-gray-700">{book.downloads || 0}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-xs text-gray-400 uppercase">Vues</p>
+                <p className="font-medium text-gray-700">{book.views || 0}</p>
+              </div>
+            </div>
+
+            {/* Infos fichier */}
+            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-6 p-4 bg-gray-50 rounded-xl">
+              <span className="flex items-center gap-2">
+                <Icons.File className="w-4 h-4" />
+                {getFileTypeLabel()}
+              </span>
+              <span className="w-px h-4 bg-gray-300" />
+              <span className="flex items-center gap-2">
+                <Icons.Clock className="w-4 h-4" />
+                {formattedDate}
+              </span>
+              {book.fileSize > 0 && (
+                <>
+                  <span className="w-px h-4 bg-gray-300" />
+                  <span className="flex items-center gap-2">
+                    <Icons.HardDrive className="w-4 h-4" />
+                    {formatFileSize(book.fileSize)}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Bouton Téléchargement */}
             <button
               onClick={handleDownload}
-              className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700 transition-colors font-medium flex items-center justify-center gap-2 mt-4"
+              disabled={downloading}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-2xl font-semibold shadow-lg hover:shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
             >
-              <Icons.Download className="w-5 h-5" />
-              Télécharger ({book.fileName || 'Document'})
+              {downloading ? (
+                <>
+                  <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Téléchargement en cours...
+                </>
+              ) : (
+                <>
+                  <Icons.Download className="w-6 h-6" />
+                  Télécharger le document
+                </>
+              )}
             </button>
+
+            {/* Informations supplémentaires */}
+            <div className="mt-4 text-center text-xs text-gray-400">
+              <span>Partagé par </span>
+              <span className="font-medium text-gray-500">
+                {book.uploadedBy?.name || 'Anonyme'}
+              </span>
+              <span className="mx-2">•</span>
+              <span>Fichier: {book.fileName || 'Document'}</span>
+            </div>
           </div>
         </div>
       </div>
