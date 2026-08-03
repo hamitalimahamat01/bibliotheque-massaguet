@@ -49,21 +49,14 @@ export function formatFileSize(bytes: number): string {
 export function getImageUrl(url: string | null | undefined): string {
   if (!url) return '';
   
-  // Si c'est déjà une URL complète, la retourner
+  // Si l'URL est déjà complète (Cloudinary, HTTP, etc.), la retourner
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
     return url;
   }
   
-  // Utiliser la base URL pour les images (sans /api)
+  // Fallback pour les URLs relatives (si jamais)
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://bibliotheque-backend-wfkn.onrender.com';
-  
-  // Nettoyer l'URL
   const cleanUrl = url.startsWith('/') ? url : `/${url}`;
   
-  // Construire l'URL complète
-  const fullUrl = `${baseUrl}${cleanUrl}`;
-  
-  console.log('📸 Image URL:', { original: url, full: fullUrl }); // Pour déboguer
-  
-  return fullUrl;
+  return `${baseUrl}${cleanUrl}`;
 }
