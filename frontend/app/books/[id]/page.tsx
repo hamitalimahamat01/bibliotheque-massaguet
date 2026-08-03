@@ -118,6 +118,7 @@ export default function BookDetailPage() {
                   src={coverImageUrl}
                   alt={book.title}
                   className="w-full h-full object-cover rounded-lg"
+                  crossOrigin="anonymous"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
