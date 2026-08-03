@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { useAuth } from '@/context/AuthContext';
 import { Icons } from '@/components/Icons';
+import { optimizeImage, formatFileSize } from '@/lib/optimize';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -18,6 +19,7 @@ export default function UploadBookPage() {
   const [cover, setCover] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const [form, setForm] = useState({
@@ -74,6 +76,52 @@ export default function UploadBookPage() {
     }
   }, []);
 
+  const onCoverDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('La couverture ne doit pas dépasser 5 MB');
+        return;
+      }
+      
+      setIsOptimizing(true);
+      const toastId = toast.loading('Optimisation de l\'image...');
+      
+      try {
+        const optimizedImage = await optimizeImage(file, {
+          maxSizeMB: 0.5,
+          maxWidthOrHeight: 1200,
+        });
+        
+        setCover(optimizedImage);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setCoverPreview(reader.result as string);
+        };
+        reader.readAsDataURL(optimizedImage);
+        
+        const savedSize = ((file.size - optimizedImage.size) / file.size * 100);
+        if (savedSize > 10) {
+          toast.success(`Image optimisée (${formatFileSize(optimizedImage.size)})`, { id: toastId });
+        } else {
+          toast.success(`Couverture ajoutée: ${optimizedImage.name}`, { id: toastId });
+        }
+      } catch (error) {
+        console.warn('Erreur optimisation image:', error);
+        setCover(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setCoverPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+        toast.success(`Couverture ajoutée: ${file.name}`, { id: toastId });
+      } finally {
+        setIsOptimizing(false);
+      }
+    }
+  }, []);
+
   const { getRootProps: getFileRootProps, getInputProps: getFileInputProps, isDragActive: isFileDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
@@ -92,23 +140,6 @@ export default function UploadBookPage() {
       }
     },
   });
-
-  const onCoverDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      const file = acceptedFiles[0];
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('La couverture ne doit pas dépasser 5 MB');
-        return;
-      }
-      setCover(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCoverPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-      toast.success(`Couverture ajoutée: ${file.name}`);
-    }
-  }, []);
 
   const { getRootProps: getCoverRootProps, getInputProps: getCoverInputProps, isDragActive: isCoverDragActive } = useDropzone({
     accept: {
@@ -171,12 +202,30 @@ export default function UploadBookPage() {
         return;
       }
 
-      const response = await fetch(`${API_URL}/books`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_URL}/books`);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(progress);
+        }
+      };
+
+      const response = await new Promise<Response>((resolve, reject) => {
+        xhr.onload = () => {
+          const response = new Response(xhr.response, {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            headers: new Headers({
+              'Content-Type': xhr.getResponseHeader('Content-Type') || 'application/json',
+            }),
+          });
+          resolve(response);
+        };
+        xhr.onerror = () => reject(new Error('Erreur de réseau'));
+        xhr.send(formData);
       });
 
       const contentType = response.headers.get('content-type');
@@ -262,6 +311,18 @@ export default function UploadBookPage() {
 
         {!showSuccess ? (
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {isOptimizing && (
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <div className="flex items-center gap-3">
+                  <svg className="animate-spin w-5 h-5 text-blue-600" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-sm text-blue-700">Optimisation de l'image en cours...</span>
+                </div>
+              </div>
+            )}
+
             {loading && (
               <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
@@ -308,7 +369,7 @@ export default function UploadBookPage() {
                   placeholder="Ex: Cours de mathématiques niveau BAC"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                   required
-                  disabled={loading}
+                  disabled={loading || isOptimizing}
                 />
               </div>
 
@@ -321,7 +382,7 @@ export default function UploadBookPage() {
                   onChange={handleChange}
                   placeholder="Nom de l'auteur (optionnel)"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                  disabled={loading}
+                  disabled={loading || isOptimizing}
                 />
               </div>
 
@@ -334,7 +395,7 @@ export default function UploadBookPage() {
                   rows={3}
                   placeholder="Décrivez brièvement le contenu du document..."
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-vertical transition-all"
-                  disabled={loading}
+                  disabled={loading || isOptimizing}
                 />
               </div>
 
@@ -346,7 +407,7 @@ export default function UploadBookPage() {
                     value={form.category}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white transition-all"
-                    disabled={loading}
+                    disabled={loading || isOptimizing}
                   >
                     <option value="general">Bibliothèque générale</option>
                     <option value="prepa">Prépa BEF/BAC</option>
@@ -359,7 +420,7 @@ export default function UploadBookPage() {
                     value={form.subCategory}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white transition-all"
-                    disabled={loading}
+                    disabled={loading || isOptimizing}
                   >
                     <option value="">Aucune</option>
                     <option value="bef">BEF</option>
@@ -378,7 +439,7 @@ export default function UploadBookPage() {
                     onChange={handleChange}
                     placeholder="Ex: Mathématiques"
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                    disabled={loading}
+                    disabled={loading || isOptimizing}
                   />
                 </div>
                 <div>
@@ -390,7 +451,7 @@ export default function UploadBookPage() {
                     onChange={handleChange}
                     placeholder="2024-2025"
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                    disabled={loading}
+                    disabled={loading || isOptimizing}
                   />
                 </div>
               </div>
@@ -486,7 +547,7 @@ export default function UploadBookPage() {
 
             <button
               type="submit"
-              disabled={loading || !file}
+              disabled={loading || !file || isOptimizing}
               className="w-full btn-primary text-base py-4 justify-center"
             >
               {loading ? (
@@ -522,3 +583,4 @@ export default function UploadBookPage() {
     </div>
   );
 }
+
