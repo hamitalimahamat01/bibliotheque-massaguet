@@ -8,12 +8,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// CHARGER DOTENV EN PREMIER
 dotenv.config();
-
-// MAINTENANT charger Cloudinary
-const { storage } = require('./src/config/cloudinary');
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -38,16 +33,32 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// ===== SERVRIR LES FICHIERS STATIQUES (LOCAL) =====
+// ===== SERVRIR LES FICHIERS STATIQUES =====
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ===== CONFIGURATION MULTER AVEC CLOUDINARY =====
-const upload = multer({
-  storage: storage,
-  limits: { 
-    fileSize: 50 * 1024 * 1024,
-    files: 2
+// ===== STORAGE MULTER (STOCKAGE LOCAL) =====
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = './uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
   },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, unique + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  }
 });
 
 // ===== AUTH MIDDLEWARE =====
@@ -72,9 +83,8 @@ app.get('/api/health', async (req, res) => {
     await pool.query('SELECT 1');
     res.json({ 
       status: 'OK', 
-      message: 'API Bibliothèque Massaguet (PostgreSQL + Cloudinary)',
-      database: '✅ Connecté à Neon',
-      storage: '✅ Cloudinary'
+      message: 'API Bibliothèque Massaguet (PostgreSQL)',
+      database: '✅ Connecté à Neon'
     });
   } catch (error) {
     res.status(500).json({ 
@@ -135,6 +145,36 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+app.get('/api/auth/profile', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, role, bio, avatar, first_name, last_name, gender, city, birth_date, documents_count, created_at FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+    res.json({ success: true, user: result.rows[0] });
+  } catch (error) {
+    console.error('❌ Erreur profile:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+app.put('/api/auth/profile', auth, async (req, res) => {
+  try {
+    const { name, bio } = req.body;
+    const result = await pool.query(
+      'UPDATE users SET name = $1, bio = $2 WHERE id = $3 RETURNING id, name, email, role, bio, avatar, documents_count, created_at',
+      [name, bio, req.user.id]
+    );
+    res.json({ success: true, user: result.rows[0] });
+  } catch (error) {
+    console.error('❌ Erreur update profile:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ===== BOOKS ROUTES =====
 app.post('/api/books', auth, upload.fields([
   { name: 'file', maxCount: 1 },
@@ -157,12 +197,12 @@ app.post('/api/books', auth, upload.fields([
       return res.status(400).json({ error: 'Le titre est requis' });
     }
 
-    // URL Cloudinary
-    const fileUrl = file.path;
-    const coverUrl = cover ? cover.path : null;
+    // 🔥 Stocker le chemin du fichier local
+    const fileUrl = `/uploads/${file.filename}`;
+    const coverUrl = cover ? `/uploads/${cover.filename}` : null;
 
-    console.log('📄 Fichier Cloudinary URL:', fileUrl);
-    console.log('🖼️ Couverture Cloudinary URL:', coverUrl);
+    console.log('📄 Fichier:', file.originalname, '→', fileUrl);
+    console.log('🖼️ Couverture:', cover ? cover.originalname : 'Aucune');
 
     const ext = path.extname(file.originalname).toLowerCase();
     const fileTypeMap = {
@@ -191,7 +231,7 @@ app.post('/api/books', auth, upload.fields([
 
     await pool.query('UPDATE users SET documents_count = documents_count + 1 WHERE id = $1', [req.user.id]);
 
-    console.log('✅ Document créé avec Cloudinary:', result.rows[0].id);
+    console.log('✅ Document créé avec succès:', result.rows[0].id);
     res.status(201).json({
       success: true,
       message: 'Document partagé avec succès',
@@ -199,6 +239,13 @@ app.post('/api/books', auth, upload.fields([
     });
   } catch (error) {
     console.error('❌ Erreur upload:', error);
+    if (req.files) {
+      ['file', 'cover'].forEach(key => {
+        if (req.files[key]?.[0]?.path && fs.existsSync(req.files[key][0].path)) {
+          try { fs.unlinkSync(req.files[key][0].path); } catch(e) {}
+        }
+      });
+    }
     res.status(500).json({ error: 'Erreur serveur: ' + error.message });
   }
 });
@@ -270,7 +317,7 @@ app.get('/api/books/:id', async (req, res) => {
   }
 });
 
-// 🔥 Téléchargement avec headers pour forcer le téléchargement
+// ===== TÉLÉCHARGEMENT DIRECT DU FICHIER PDF =====
 app.get('/api/books/:id/download', async (req, res) => {
   try {
     const result = await pool.query(
@@ -283,40 +330,49 @@ app.get('/api/books/:id/download', async (req, res) => {
     }
 
     const book = result.rows[0];
-    console.log('📥 Téléchargement:', book.file_name);
+    console.log('📥 Téléchargement:', book.file_name, 'Type:', book.file_type);
 
-    // Si c'est une URL Cloudinary (commence par http)
-    if (book.file_url && book.file_url.startsWith('http')) {
-      // Rediriger vers Cloudinary avec headers de téléchargement
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(book.file_name)}"`);
-      return res.redirect(302, book.file_url);
-    }
+    // 🔥 Incrémenter les téléchargements
+    await pool.query('UPDATE books SET downloads = downloads + 1 WHERE id = $1', [req.params.id]);
 
-    // Si c'est un fichier local
+    // 🔥 Vérifier que le fichier existe
     const filePath = path.join(__dirname, book.file_url);
+    
     if (!fs.existsSync(filePath)) {
       console.error('❌ Fichier introuvable:', filePath);
       return res.status(404).json({ error: 'Fichier introuvable' });
     }
 
-    // 🔥 Forcer le téléchargement avec les bons headers
-    res.setHeader('Content-Type', 'application/octet-stream');
+    // 🔥 Déterminer le type MIME correct
+    const ext = path.extname(book.file_name).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.doc': 'application/msword',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    };
+    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+
+    // 🔥 Headers pour forcer le téléchargement du vrai fichier
+    res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(book.file_name)}"`);
     res.setHeader('Content-Length', fs.statSync(filePath).size);
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     
-    // Incrémenter les téléchargements
-    await pool.query('UPDATE books SET downloads = downloads + 1 WHERE id = $1', [req.params.id]);
+    // 🔥 Envoyer le fichier en stream
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
     
-    // Envoyer le fichier
-    res.download(filePath, book.file_name, (err) => {
-      if (err) {
-        console.error('❌ Erreur download:', err);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'Erreur lors du téléchargement' });
-        }
+    fileStream.on('error', (err) => {
+      console.error('❌ Erreur stream:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Erreur lors du téléchargement' });
       }
     });
+
   } catch (error) {
     console.error('❌ Erreur download:', error);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -395,7 +451,6 @@ const initDB = async () => {
 };
 
 // ===== START =====
-// Créer le dossier uploads
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads', { recursive: true });
 }
@@ -404,6 +459,7 @@ initDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur: http://0.0.0.0:${PORT}`);
     console.log('📊 Base de données: PostgreSQL (Neon)');
-    console.log('☁️  Stockage: Cloudinary');
+    console.log('📁 Stockage: Local (uploads/)');
+    console.log('📄 Téléchargement: Fichiers originaux (PDF, DOCX, PPT)');
   });
 });
