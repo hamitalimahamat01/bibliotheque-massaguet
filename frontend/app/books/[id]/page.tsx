@@ -72,29 +72,35 @@ export default function BookDetailPage() {
     }
   };
 
+  // 🔥 Téléchargement direct
   const handleDownload = async () => {
     if (!book) return;
     
     setDownloading(true);
     try {
-      // 🔥 Utiliser la nouvelle méthode de téléchargement
-      const res = await booksApi.download(book.id);
-      console.log('📥 Réponse téléchargement:', res);
-      
-      if (res.data?.downloadUrl) {
-        // Ouvrir dans un nouvel onglet
-        window.open(res.data.downloadUrl, '_blank');
-        toast.success('Téléchargement démarré !');
-      } else {
-        toast.error('URL de téléchargement non disponible');
-      }
-    } catch (error: any) {
-      console.error('❌ Erreur téléchargement:', error);
-      // 🔥 Fallback: essayer directement l'URL
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://bibliotheque-backend-wfkn.onrender.com';
       const downloadUrl = `${baseUrl}/api/books/${book.id}/download`;
-      window.open(downloadUrl, '_blank');
+      
+      // Créer un lien de téléchargement invisible
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = book.fileName || 'document.pdf';
+      link.target = '_blank';
+      
+      // Ajouter le token dans l'URL si nécessaire
+      const token = localStorage.getItem('token');
+      if (token) {
+        link.href = `${downloadUrl}?token=${encodeURIComponent(token)}`;
+      }
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
       toast.success('Téléchargement démarré !');
+    } catch (error: any) {
+      console.error('❌ Erreur téléchargement:', error);
+      toast.error('Erreur lors du téléchargement');
     } finally {
       setDownloading(false);
     }
@@ -160,6 +166,7 @@ export default function BookDetailPage() {
       })
     : 'Date inconnue';
 
+  // 🔥 Partagé par : nom d'utilisateur
   const uploadedByName = book.uploadedBy?.name || book.uploaded_by_name || 'Anonyme';
 
   return (
@@ -174,6 +181,7 @@ export default function BookDetailPage() {
 
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-100/50">
         <div className="grid md:grid-cols-3 gap-0">
+          {/* Section Couverture */}
           <div className="md:col-span-1 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-8 flex items-center justify-center min-h-[300px]">
             <div className="aspect-[3/4] w-full max-w-sm rounded-2xl bg-white shadow-lg overflow-hidden flex items-center justify-center relative">
               {hasCover ? (
@@ -209,12 +217,14 @@ export default function BookDetailPage() {
             </div>
           </div>
 
+          {/* Section Détails */}
           <div className="md:col-span-2 p-8 md:p-10">
             <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
               <div>
                 <h1 className="text-3xl md:text-4xl font-bold text-gray-800 leading-tight">
                   {book.title}
                 </h1>
+                {/* 🔥 Auteur : nom */}
                 <p className="text-gray-500 mt-2 flex items-center gap-2">
                   <Icons.User className="w-4 h-4" />
                   <span><span className="font-medium">Auteur :</span> {book.author || 'Anonyme'}</span>
@@ -239,6 +249,7 @@ export default function BookDetailPage() {
               </div>
             )}
 
+            {/* Métadonnées */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
               {book.subject && (
                 <div className="bg-gray-50 rounded-xl p-3 text-center">
@@ -262,6 +273,7 @@ export default function BookDetailPage() {
               </div>
             </div>
 
+            {/* Infos fichier */}
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-6 p-4 bg-gray-50 rounded-xl">
               <span className="flex items-center gap-2">
                 <Icons.File className="w-4 h-4" />
@@ -283,6 +295,7 @@ export default function BookDetailPage() {
               )}
             </div>
 
+            {/* 🔥 Bouton Téléchargement Direct */}
             <button
               onClick={handleDownload}
               disabled={downloading}
@@ -304,13 +317,12 @@ export default function BookDetailPage() {
               )}
             </button>
 
-            <div className="mt-4 text-center text-xs text-gray-400">
-              <span>Partagé par </span>
-              <span className="font-medium text-gray-500">
-                {uploadedByName}
-              </span>
-              <span className="mx-2">•</span>
-              <span>Fichier: {book.fileName || 'Document'}</span>
+            {/* 🔥 Partagé par : nom */}
+            <div className="mt-4 text-center text-xs text-gray-400 flex items-center justify-center gap-2 flex-wrap">
+              <span>Partagé par :</span>
+              <span className="font-medium text-gray-500">{uploadedByName}</span>
+              <span className="text-gray-300">•</span>
+              <span>Fichier : {book.fileName || 'Document'}</span>
             </div>
           </div>
         </div>
