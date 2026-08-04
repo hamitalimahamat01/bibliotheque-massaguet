@@ -26,7 +26,7 @@ interface Book {
   downloads: number;
   views: number;
   createdAt: string;
-  uploadedBy?: { id: string; name: string; email: string };
+  uploadedBy?: { id: number; name: string; email: string };
   uploaded_by_name?: string;
 }
 
@@ -164,8 +164,12 @@ export default function BookDetailPage() {
     }
   };
 
-  // Vérifier si l'utilisateur est le propriétaire ou admin
-  const canEdit = user && book && (user.id === book.uploadedBy?.id || user.role === 'ADMIN');
+  // 🔥 Vérifier si l'utilisateur est le propriétaire ou admin
+  // Convertir les IDs en string pour la comparaison
+  const canEdit = user && book && (
+    String(user.id) === String(book.uploadedBy?.id) || 
+    user.role === 'ADMIN'
+  );
 
   if (loading) {
     return (
