@@ -24,6 +24,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
+  updateProfile: (data: { name?: string; bio?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -130,8 +131,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
+  const updateProfile = async (data: { name?: string; bio?: string }) => {
+    try {
+      const response = await authApi.updateProfile(data);
+      if (response.data?.success && response.data?.user) {
+        updateUser(response.data.user);
+        toast.success('Profil mis à jour !');
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur update profile:', error);
+      const message = error.response?.data?.error || 'Erreur lors de la mise à jour';
+      toast.error(message);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );
