@@ -1,209 +1,137 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import { signIn, signOut, useSession } from 'next-auth/react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { authApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 interface User {
-  id: string | number;
+  id: number;
   name: string;
   email: string;
-  role?: string;
+  role: string;
   bio?: string;
   avatar?: string;
-  firstName?: string;
-  lastName?: string;
-  gender?: string;
-  city?: string;
-  birthDate?: string;
-  documentsCount?: number;
-  provider?: string;
+  documents_count?: number;
+  first_name?: string;
+  last_name?: string;
+  created_at?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
-  updateProfile: (data: Partial<User>) => Promise<void>;
-  googleLogin: () => Promise<void>;
-  setUser: (user: User | null) => void;
+  updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const { data: session, status } = useSession();
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
 
-  // Gestion de l'utilisateur depuis le token JWT ou la session NextAuth
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    
-    if (session?.user) {
-      // Connexion Google via NextAuth
-      setUser({
-        id: session.user.id || '',
-        name: session.user.name || '',
-        email: session.user.email || '',
-        avatar: session.user.image || '',
-        provider: 'google',
-        isAuthenticated: true,
-      } as any);
-      setIsLoading(false);
-      return;
-    }
-
-    if (token) {
-      // Connexion email/password via notre backend
-      fetchProfile(token);
-    } else {
-      setIsLoading(false);
-    }
-  }, [session, status]);
-
-  const fetchProfile = async (token: string) => {
-    try {
-      const response = await fetch(`${API_URL}/auth/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+    const loadUser = async () => {
+      const token = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
       
-      if (response.ok) {
-        const data = await response.json();
-        setUser({ ...data.user, provider: 'email' });
-      } else {
-        localStorage.removeItem('token');
-        setUser(null);
+      if (token && storedUser) {
+        try {
+          const response = await authApi.getProfile();
+          if (response.data?.success && response.data?.user) {
+            setUser(response.data.user);
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+          } else {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('❌ Erreur chargement profil:', error);
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+          } catch (e) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+          }
+        }
       }
-    } catch (error) {
-      console.error('Erreur chargement profil:', error);
-      localStorage.removeItem('token');
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      setLoading(false);
+    };
+
+    loadUser();
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur de connexion');
+      setLoading(true);
+      const response = await authApi.login({ email, password });
+      
+      if (response.data?.success) {
+        const { token, user } = response.data;
+        
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setUser(user);
+        
+        toast.success('Connexion réussie !');
+      } else {
+        toast.error('Erreur de connexion');
       }
-
-      localStorage.setItem('token', data.token);
-      setUser({ ...data.user, provider: 'email' });
-      toast.success('Connexion réussie !');
-      router.push('/profile/complete');
     } catch (error: any) {
-      toast.error(error.message || 'Erreur de connexion');
+      console.error('❌ Erreur login:', error);
+      const message = error.response?.data?.error || 'Erreur de connexion';
+      toast.error(message);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const register = async (name: string, email: string, password: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur d\'inscription');
+      setLoading(true);
+      const response = await authApi.register({ name, email, password });
+      
+      if (response.data?.success) {
+        const { token, user } = response.data;
+        
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setUser(user);
+        
+        toast.success('Inscription réussie !');
+      } else {
+        toast.error('Erreur d\'inscription');
       }
-
-      localStorage.setItem('token', data.token);
-      setUser({ ...data.user, provider: 'email' });
-      toast.success('Inscription réussie !');
-      router.push('/profile/complete');
     } catch (error: any) {
-      toast.error(error.message || 'Erreur d\'inscription');
+      console.error('❌ Erreur register:', error);
+      const message = error.response?.data?.error || 'Erreur d\'inscription';
+      toast.error(message);
       throw error;
-    }
-  };
-
-  const googleLogin = async () => {
-    try {
-      await signIn('google', {
-        callbackUrl: '/profile/complete',
-        redirect: true,
-      });
-    } catch (error) {
-      console.error('Erreur Google:', error);
-      toast.error('Erreur lors de la connexion avec Google');
-      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
-    signOut({ redirect: false });
     toast.success('Déconnexion réussie');
-    router.push('/login');
   };
 
-  const updateProfile = async (data: Partial<User>) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Non authentifié');
-
-      const response = await fetch(`${API_URL}/auth/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Erreur de mise à jour');
-      }
-
-      setUser({ ...result.user, provider: 'email' });
-      toast.success('Profil mis à jour');
-    } catch (error: any) {
-      toast.error(error.message || 'Erreur de mise à jour');
-      throw error;
-    }
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        register,
-        logout,
-        updateProfile,
-        googleLogin,
-        setUser,
-      }}
-    >
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
