@@ -47,27 +47,11 @@ export const booksApi = {
     api.post('/books', data, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  // 🔥 Mise à jour
   update: (id: string, data: any) => api.put(`/books/${id}`, data),
+  // 🔥 Suppression
   delete: (id: string) => api.delete(`/books/${id}`),
-  // 🔥 Téléchargement - suivre la redirection
-  download: async (id: string) => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://bibliotheque-backend-wfkn.onrender.com';
-    const response = await fetch(`${baseUrl}/api/books/${id}/download`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-      redirect: 'follow',
-    });
-    
-    if (response.ok) {
-      // Si c'est une redirection, obtenir l'URL finale
-      const finalUrl = response.url;
-      return { data: { downloadUrl: finalUrl } };
-    } else {
-      throw new Error('Erreur de téléchargement');
-    }
-  },
+  download: (id: string) => api.get(`/books/${id}/download`),
 };
 
 export const categoriesApi = {

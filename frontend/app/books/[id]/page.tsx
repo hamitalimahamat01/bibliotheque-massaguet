@@ -165,7 +165,6 @@ export default function BookDetailPage() {
   };
 
   // 🔥 Vérifier si l'utilisateur est le propriétaire ou admin
-  // Convertir les IDs en string pour la comparaison
   const canEdit = user && book && (
     String(user.id) === String(book.uploadedBy?.id) || 
     user.role === 'ADMIN'
@@ -384,20 +383,20 @@ export default function BookDetailPage() {
                 <span>Fichier : {book.fileName || 'Document'}</span>
               </div>
 
-              {/* 🔥 Boutons Modifier / Supprimer */}
+              {/* 🔥 Boutons Modifier / Supprimer - VISIBLES UNIQUEMENT POUR LE PROPRIÉTAIRE OU ADMIN */}
               {canEdit && (
-                <div className="mt-4 flex gap-3 justify-center">
+                <div className="mt-6 flex flex-wrap gap-3 justify-center border-t border-gray-100 pt-6">
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors text-sm font-medium"
+                    className="flex items-center gap-2 px-6 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors text-sm font-medium border border-indigo-200"
                   >
                     <Icons.Edit className="w-4 h-4" />
-                    Modifier
+                    Modifier le document
                   </button>
                   <button
                     onClick={handleDelete}
                     disabled={isDeleting}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium disabled:opacity-50"
+                    className="flex items-center gap-2 px-6 py-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium border border-red-200 disabled:opacity-50"
                   >
                     {isDeleting ? (
                       <>
@@ -410,7 +409,7 @@ export default function BookDetailPage() {
                     ) : (
                       <>
                         <Icons.Trash className="w-4 h-4" />
-                        Supprimer
+                        Supprimer le document
                       </>
                     )}
                   </button>
@@ -419,9 +418,21 @@ export default function BookDetailPage() {
             </div>
           </div>
         ) : (
-          // 🔥 Formulaire d'édition
+          // 🔥 FORMULAIRE D'ÉDITION
           <div className="p-8 md:p-10">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Modifier le document</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Modifier le document</h2>
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  loadBook();
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <Icons.Close className="w-6 h-6" />
+              </button>
+            </div>
+            
             <form onSubmit={handleUpdate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -505,13 +516,13 @@ export default function BookDetailPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-medium"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all font-medium flex items-center justify-center gap-2"
                 >
-                  <Icons.Save className="w-5 h-5 inline mr-2" />
-                  Enregistrer
+                  <Icons.Save className="w-5 h-5" />
+                  Enregistrer les modifications
                 </button>
                 <button
                   type="button"
