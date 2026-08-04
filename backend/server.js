@@ -1,29 +1,23 @@
-// 1. CHARGER DOTENV EN PREMIER
-const dotenv = require('dotenv');
-dotenv.config();
-
-// 2. MAINTENANT charger les autres modules
 const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const dotenv = require('dotenv');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// 3. MAINTENANT charger Cloudinary (les variables sont disponibles)
-const { storage, cloudinary } = require('./src/config/cloudinary');
+// CHARGER DOTENV EN PREMIER
+dotenv.config();
+
+// MAINTENANT charger Cloudinary
+const { storage } = require('./src/config/cloudinary');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 console.log('🚀 Démarrage du serveur...');
-console.log('☁️ Cloudinary configuré avec:', {
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? '✅' : '❌',
-  api_key: process.env.CLOUDINARY_API_KEY ? '✅' : '❌',
-  api_secret: process.env.CLOUDINARY_API_SECRET ? '✅' : '❌',
-});
 
 // PostgreSQL Connection
 const pool = new Pool({
@@ -43,6 +37,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// ===== SERVRIR LES FICHIERS STATIQUES (LOCAL) =====
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ===== CONFIGURATION MULTER AVEC CLOUDINARY =====
 const upload = multer({
@@ -77,11 +74,7 @@ app.get('/api/health', async (req, res) => {
       status: 'OK', 
       message: 'API Bibliothèque Massaguet (PostgreSQL + Cloudinary)',
       database: '✅ Connecté à Neon',
-      storage: '✅ Cloudinary',
-      cloudinary: {
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'non défini',
-        configured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
-      }
+      storage: '✅ Cloudinary'
     });
   } catch (error) {
     res.status(500).json({ 
@@ -149,7 +142,6 @@ app.post('/api/books', auth, upload.fields([
 ]), async (req, res) => {
   try {
     console.log('📤 Upload reçu');
-    console.log('Fichiers reçus:', req.files ? Object.keys(req.files) : 'Aucun');
     
     const files = req.files;
     const file = files?.file?.[0] || null;
@@ -278,14 +270,53 @@ app.get('/api/books/:id', async (req, res) => {
   }
 });
 
+// 🔥 Téléchargement avec headers pour forcer le téléchargement
 app.get('/api/books/:id/download', async (req, res) => {
   try {
-    const result = await pool.query('SELECT file_url, file_name FROM books WHERE id = $1', [req.params.id]);
+    const result = await pool.query(
+      'SELECT file_url, file_name, file_type FROM books WHERE id = $1',
+      [req.params.id]
+    );
+    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Document non trouvé' });
     }
+
+    const book = result.rows[0];
+    console.log('📥 Téléchargement:', book.file_name);
+
+    // Si c'est une URL Cloudinary (commence par http)
+    if (book.file_url && book.file_url.startsWith('http')) {
+      // Rediriger vers Cloudinary avec headers de téléchargement
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(book.file_name)}"`);
+      return res.redirect(302, book.file_url);
+    }
+
+    // Si c'est un fichier local
+    const filePath = path.join(__dirname, book.file_url);
+    if (!fs.existsSync(filePath)) {
+      console.error('❌ Fichier introuvable:', filePath);
+      return res.status(404).json({ error: 'Fichier introuvable' });
+    }
+
+    // 🔥 Forcer le téléchargement avec les bons headers
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(book.file_name)}"`);
+    res.setHeader('Content-Length', fs.statSync(filePath).size);
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    // Incrémenter les téléchargements
     await pool.query('UPDATE books SET downloads = downloads + 1 WHERE id = $1', [req.params.id]);
-    res.redirect(result.rows[0].file_url);
+    
+    // Envoyer le fichier
+    res.download(filePath, book.file_name, (err) => {
+      if (err) {
+        console.error('❌ Erreur download:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Erreur lors du téléchargement' });
+        }
+      }
+    });
   } catch (error) {
     console.error('❌ Erreur download:', error);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -364,11 +395,15 @@ const initDB = async () => {
 };
 
 // ===== START =====
+// Créer le dossier uploads
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads', { recursive: true });
+}
+
 initDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur: http://0.0.0.0:${PORT}`);
     console.log('📊 Base de données: PostgreSQL (Neon)');
     console.log('☁️  Stockage: Cloudinary');
-    console.log('☁️ Cloudinary cloud_name:', process.env.CLOUDINARY_CLOUD_NAME);
   });
 });
