@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Icons } from '@/components/Icons';
 import { getImageUrl } from '@/lib/optimize';
 
@@ -11,7 +11,7 @@ interface Book {
   description: string;
   author: string;
   category: string;
-  fileType: string;
+  fileType?: string;
   downloads: number;
   views: number;
   createdAt: string;
@@ -26,19 +26,12 @@ interface BookCardProps {
 
 export default function BookCard({ book }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string>('');
+  const coverImageUrl = getImageUrl(book.coverUrl);
+  const hasCover = coverImageUrl && coverImageUrl.length > 0 && !imageError;
 
-  useEffect(() => {
-    const url = getImageUrl(book.coverUrl);
-    console.log('🖼️ BookCard:', { 
-      title: book.title, 
-      coverUrl: book.coverUrl,
-      imageUrl: url 
-    });
-    setImageUrl(url);
-  }, [book.coverUrl, book.title]);
-
-  const hasCover = imageUrl && imageUrl.length > 0 && !imageError;
+  // 🔥 Gérer le cas où fileType est undefined
+  const fileType = book.fileType || 'pdf';
+  const fileTypeUpper = fileType.toUpperCase();
 
   return (
     <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100/50 group">
@@ -46,25 +39,19 @@ export default function BookCard({ book }: BookCardProps) {
         <div className="relative h-48 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center overflow-hidden">
           {hasCover ? (
             <img
-              src={imageUrl}
+              src={coverImageUrl}
               alt={book.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              onError={(e) => {
-                console.error('❌ Erreur chargement image:', imageUrl);
-                setImageError(true);
-              }}
+              onError={() => setImageError(true)}
               loading="lazy"
-              crossOrigin="anonymous"
             />
           ) : (
             <Icons.Book className="w-12 h-12 text-indigo-400" />
           )}
           <div className="absolute top-3 right-3 flex gap-2">
-            {book.fileType && (
-              <span className="bg-white/90 backdrop-blur-sm text-gray-700 text-xs px-2 py-1 rounded-full font-medium">
-                {book.fileType.toUpperCase()}
-              </span>
-            )}
+            <span className="bg-white/90 backdrop-blur-sm text-gray-700 text-xs px-2 py-1 rounded-full font-medium">
+              {fileTypeUpper}
+            </span>
           </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
             <span className="text-white text-sm font-medium">Voir le document</span>

@@ -17,7 +17,7 @@ interface Book {
   category: string;
   subCategory: string;
   subject: string;
-  fileType: string;
+  fileType?: string;
   fileUrl: string;
   fileName: string;
   fileSize: number;
@@ -26,7 +26,7 @@ interface Book {
   downloads: number;
   views: number;
   createdAt: string;
-  uploadedBy: { id: string; name: string; email: string };
+  uploadedBy?: { id: string; name: string; email: string };
 }
 
 export default function BookDetailPage() {
@@ -36,20 +36,36 @@ export default function BookDetailPage() {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const bookId = params?.id as string;
 
   useEffect(() => {
+    if (!bookId) {
+      setError('ID du document manquant');
+      setLoading(false);
+      return;
+    }
     loadBook();
-  }, [params.id]);
+  }, [bookId]);
 
   const loadBook = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res: any = await booksApi.getById(params.id as string);
-      setBook(res.data.book);
-    } catch (error) {
-      console.error('Erreur chargement livre:', error);
-      toast.error('Livre non trouvé');
-      router.push('/books');
+      const res: any = await booksApi.getById(bookId);
+      console.log('📖 Réponse API:', res.data);
+      
+      if (res.data?.book) {
+        setBook(res.data.book);
+      } else {
+        setError('Document non trouvé');
+        toast.error('Document non trouvé');
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur chargement livre:', error);
+      setError(error?.message || 'Erreur lors du chargement');
+      toast.error('Erreur lors du chargement du document');
     } finally {
       setLoading(false);
     }
@@ -62,7 +78,6 @@ export default function BookDetailPage() {
     try {
       const res: any = await booksApi.download(book.id);
       
-      // La réponse peut être une redirection ou une URL
       if (res.data?.downloadUrl) {
         window.open(res.data.downloadUrl, '_blank');
         toast.success('Téléchargement démarré !');
@@ -73,7 +88,7 @@ export default function BookDetailPage() {
         toast.error('URL de téléchargement non disponible');
       }
     } catch (error) {
-      console.error('Erreur téléchargement:', error);
+      console.error('❌ Erreur téléchargement:', error);
       toast.error('Erreur lors du téléchargement');
     } finally {
       setDownloading(false);
@@ -88,15 +103,15 @@ export default function BookDetailPage() {
     );
   }
 
-  if (!book) {
+  if (error || !book) {
     return (
       <div className="text-center py-12">
         <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Icons.Book className="w-10 h-10 text-gray-400" />
         </div>
         <h2 className="text-2xl font-bold text-gray-600 mb-2">Document non trouvé</h2>
-        <p className="text-gray-400 mb-6">Le document que vous recherchez n'existe pas ou a été supprimé.</p>
-        <Link href="/books" className="btn-primary inline-flex items-center gap-2">
+        <p className="text-gray-400 mb-6">{error || 'Le document que vous recherchez n\'existe pas ou a été supprimé.'}</p>
+        <Link href="/books" className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors">
           <Icons.ArrowLeft className="w-4 h-4" />
           Retour à la bibliothèque
         </Link>
@@ -107,6 +122,10 @@ export default function BookDetailPage() {
   const coverImageUrl = getImageUrl(book.coverUrl);
   const hasCover = coverImageUrl && coverImageUrl.length > 0;
 
+  // 🔥 Gérer le cas où fileType est undefined
+  const fileType = book.fileType || 'pdf';
+  const fileTypeUpper = fileType.toUpperCase();
+
   const getFileIcon = () => {
     const icons: Record<string, string> = {
       pdf: '📄',
@@ -114,7 +133,7 @@ export default function BookDetailPage() {
       ppt: '📊',
       pptx: '📊',
     };
-    return icons[book.fileType] || '📄';
+    return icons[fileType] || '📄';
   };
 
   const getFileTypeLabel = () => {
@@ -124,30 +143,28 @@ export default function BookDetailPage() {
       ppt: 'PowerPoint',
       pptx: 'PowerPoint',
     };
-    return labels[book.fileType] || book.fileType.toUpperCase();
+    return labels[fileType] || fileTypeUpper;
   };
 
-  const formattedDate = new Date(book.createdAt).toLocaleDateString('fr-FR', {
+  const formattedDate = book.createdAt ? new Date(book.createdAt).toLocaleDateString('fr-FR', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  });
+  }) : 'Date inconnue';
 
   return (
-    <div className="animate-fade-in max-w-5xl mx-auto">
-      {/* Fil d'Ariane */}
-      <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+    <div className="animate-fade-in max-w-5xl mx-auto px-4">
+      <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6 flex-wrap">
         <Link href="/" className="hover:text-indigo-600 transition-colors">Accueil</Link>
-        <Icons.ChevronRight className="w-4 h-4" />
+        <span className="text-gray-300">›</span>
         <Link href="/books" className="hover:text-indigo-600 transition-colors">Bibliothèque</Link>
-        <Icons.ChevronRight className="w-4 h-4" />
+        <span className="text-gray-300">›</span>
         <span className="text-gray-700 font-medium truncate max-w-[200px]">{book.title}</span>
       </nav>
 
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-100/50">
         <div className="grid md:grid-cols-3 gap-0">
-          {/* Section Couverture */}
-          <div className="md:col-span-1 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-8 flex items-center justify-center">
+          <div className="md:col-span-1 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-8 flex items-center justify-center min-h-[300px]">
             <div className="aspect-[3/4] w-full max-w-sm rounded-2xl bg-white shadow-lg overflow-hidden flex items-center justify-center relative">
               {hasCover ? (
                 <img
@@ -182,7 +199,6 @@ export default function BookDetailPage() {
             </div>
           </div>
 
-          {/* Section Détails */}
           <div className="md:col-span-2 p-8 md:p-10">
             <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
               <div>
@@ -191,15 +207,15 @@ export default function BookDetailPage() {
                 </h1>
                 <p className="text-gray-500 mt-2 flex items-center gap-2">
                   <Icons.User className="w-4 h-4" />
-                  par <span className="font-medium text-gray-700">{book.author}</span>
+                  par <span className="font-medium text-gray-700">{book.author || 'Anonyme'}</span>
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="badge bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium">
                   {book.category === 'prepa' ? 'Prépa' : 'Général'}
                 </span>
                 {book.subCategory && (
-                  <span className="badge bg-green-100 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium uppercase">
+                  <span className="bg-green-100 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium uppercase">
                     {book.subCategory}
                   </span>
                 )}
@@ -213,7 +229,6 @@ export default function BookDetailPage() {
               </div>
             )}
 
-            {/* Métadonnées */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
               {book.subject && (
                 <div className="bg-gray-50 rounded-xl p-3 text-center">
@@ -237,7 +252,6 @@ export default function BookDetailPage() {
               </div>
             </div>
 
-            {/* Infos fichier */}
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-6 p-4 bg-gray-50 rounded-xl">
               <span className="flex items-center gap-2">
                 <Icons.File className="w-4 h-4" />
@@ -259,7 +273,6 @@ export default function BookDetailPage() {
               )}
             </div>
 
-            {/* Bouton Téléchargement */}
             <button
               onClick={handleDownload}
               disabled={downloading}
@@ -281,7 +294,6 @@ export default function BookDetailPage() {
               )}
             </button>
 
-            {/* Informations supplémentaires */}
             <div className="mt-4 text-center text-xs text-gray-400">
               <span>Partagé par </span>
               <span className="font-medium text-gray-500">
