@@ -38,23 +38,23 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ===== STORAGE MULTER (STOCKAGE LOCAL) =====
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: function(req, file, cb) {
     const uploadDir = './uploads';
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
+  filename: function(req, file, cb) {
     const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, unique + path.extname(file.originalname));
   }
 });
 
 const upload = multer({
-  storage,
+  storage: storage,
   limits: { fileSize: 50 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
+  fileFilter: function(req, file, cb) {
     const allowed = ['.pdf', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png', '.webp'];
     const ext = path.extname(file.originalname).toLowerCase();
     cb(null, allowed.includes(ext));
@@ -62,7 +62,7 @@ const upload = multer({
 });
 
 // ===== AUTH MIDDLEWARE =====
-const auth = (req, res, next) => {
+const auth = function(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Token manquant' });
@@ -78,7 +78,7 @@ const auth = (req, res, next) => {
 };
 
 // ===== HEALTH CHECK =====
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', async function(req, res) {
   try {
     await pool.query('SELECT 1');
     res.json({ 
@@ -95,7 +95,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ===== AUTH ROUTES =====
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', async function(req, res) {
   try {
     const { name, email, password } = req.body;
     const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -120,7 +120,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', async function(req, res) {
   try {
     const { email, password } = req.body;
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -145,7 +145,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.get('/api/auth/profile', auth, async (req, res) => {
+app.get('/api/auth/profile', auth, async function(req, res) {
   try {
     const result = await pool.query(
       'SELECT id, name, email, role, bio, avatar, first_name, last_name, gender, city, birth_date, documents_count, created_at FROM users WHERE id = $1',
@@ -161,7 +161,7 @@ app.get('/api/auth/profile', auth, async (req, res) => {
   }
 });
 
-app.put('/api/auth/profile', auth, async (req, res) => {
+app.put('/api/auth/profile', auth, async function(req, res) {
   try {
     const { name, bio } = req.body;
     const result = await pool.query(
@@ -179,7 +179,7 @@ app.put('/api/auth/profile', auth, async (req, res) => {
 app.post('/api/books', auth, upload.fields([
   { name: 'file', maxCount: 1 },
   { name: 'cover', maxCount: 1 }
-]), async (req, res) => {
+]), async function(req, res) {
   try {
     console.log('📤 Upload reçu');
     
@@ -197,7 +197,6 @@ app.post('/api/books', auth, upload.fields([
       return res.status(400).json({ error: 'Le titre est requis' });
     }
 
-    // 🔥 Stocker le chemin du fichier local
     const fileUrl = `/uploads/${file.filename}`;
     const coverUrl = cover ? `/uploads/${cover.filename}` : null;
 
@@ -205,13 +204,13 @@ app.post('/api/books', auth, upload.fields([
     console.log('🖼️ Couverture:', cover ? cover.originalname : 'Aucune');
 
     const ext = path.extname(file.originalname).toLowerCase();
-    const fileTypeMap = {
+    var fileTypeMap = {
       '.pdf': 'pdf',
       '.docx': 'docx',
       '.ppt': 'ppt',
       '.pptx': 'ppt'
     };
-    const fileType = fileTypeMap[ext] || 'pdf';
+    var fileType = fileTypeMap[ext] || 'pdf';
 
     const result = await pool.query(
       `INSERT INTO books 
@@ -240,7 +239,7 @@ app.post('/api/books', auth, upload.fields([
   } catch (error) {
     console.error('❌ Erreur upload:', error);
     if (req.files) {
-      ['file', 'cover'].forEach(key => {
+      ['file', 'cover'].forEach(function(key) {
         if (req.files[key]?.[0]?.path && fs.existsSync(req.files[key][0].path)) {
           try { fs.unlinkSync(req.files[key][0].path); } catch(e) {}
         }
@@ -250,14 +249,14 @@ app.post('/api/books', auth, upload.fields([
   }
 });
 
-app.get('/api/books', async (req, res) => {
+app.get('/api/books', async function(req, res) {
   try {
     const { category, search, limit = 12, page = 1, subCategory } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
-    let query = 'SELECT * FROM books';
+    var query = 'SELECT * FROM books';
     const params = [];
-    let paramCount = 1;
+    var paramCount = 1;
     const conditions = [];
 
     if (category) {
@@ -304,7 +303,7 @@ app.get('/api/books', async (req, res) => {
   }
 });
 
-app.get('/api/books/:id', async (req, res) => {
+app.get('/api/books/:id', async function(req, res) {
   try {
     const result = await pool.query('SELECT * FROM books WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
@@ -318,7 +317,7 @@ app.get('/api/books/:id', async (req, res) => {
 });
 
 // ===== TÉLÉCHARGEMENT DIRECT DU FICHIER PDF =====
-app.get('/api/books/:id/download', async (req, res) => {
+app.get('/api/books/:id/download', async function(req, res) {
   try {
     const result = await pool.query(
       'SELECT file_url, file_name, file_type FROM books WHERE id = $1',
@@ -332,10 +331,8 @@ app.get('/api/books/:id/download', async (req, res) => {
     const book = result.rows[0];
     console.log('📥 Téléchargement:', book.file_name, 'Type:', book.file_type);
 
-    // 🔥 Incrémenter les téléchargements
     await pool.query('UPDATE books SET downloads = downloads + 1 WHERE id = $1', [req.params.id]);
 
-    // 🔥 Vérifier que le fichier existe
     const filePath = path.join(__dirname, book.file_url);
     
     if (!fs.existsSync(filePath)) {
@@ -345,18 +342,18 @@ app.get('/api/books/:id/download', async (req, res) => {
 
     // 🔥 Déterminer le type MIME correct
     const ext = path.extname(book.file_name).toLowerCase();
-    const mimeTypes: Record<string, string> = {
+    var mimeTypes = {
       '.pdf': 'application/pdf',
       '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       '.doc': 'application/msword',
       '.ppt': 'application/vnd.ms-powerpoint',
       '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     };
-    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+    var mimeType = mimeTypes[ext] || 'application/octet-stream';
 
-    // 🔥 Headers pour forcer le téléchargement du vrai fichier
+    // 🔥 Headers pour forcer le téléchargement
     res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(book.file_name)}"`);
+    res.setHeader('Content-Disposition', 'attachment; filename="' + encodeURIComponent(book.file_name) + '"');
     res.setHeader('Content-Length', fs.statSync(filePath).size);
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -366,7 +363,7 @@ app.get('/api/books/:id/download', async (req, res) => {
     const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
     
-    fileStream.on('error', (err) => {
+    fileStream.on('error', function(err) {
       console.error('❌ Erreur stream:', err);
       if (!res.headersSent) {
         res.status(500).json({ error: 'Erreur lors du téléchargement' });
@@ -380,7 +377,7 @@ app.get('/api/books/:id/download', async (req, res) => {
 });
 
 // ===== CATEGORIES =====
-app.get('/api/categories', (req, res) => {
+app.get('/api/categories', function(req, res) {
   res.json({
     success: true,
     categories: [
@@ -395,7 +392,7 @@ app.get('/api/categories', (req, res) => {
 });
 
 // ===== INIT DB =====
-const initDB = async () => {
+const initDB = async function() {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -455,9 +452,9 @@ if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads', { recursive: true });
 }
 
-initDB().then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Serveur: http://0.0.0.0:${PORT}`);
+initDB().then(function() {
+  app.listen(PORT, '0.0.0.0', function() {
+    console.log('🚀 Serveur: http://0.0.0.0:' + PORT);
     console.log('📊 Base de données: PostgreSQL (Neon)');
     console.log('📁 Stockage: Local (uploads/)');
     console.log('📄 Téléchargement: Fichiers originaux (PDF, DOCX, PPT)');
