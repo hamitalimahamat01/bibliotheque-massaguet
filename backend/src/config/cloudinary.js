@@ -18,11 +18,10 @@ console.log('☁️ Cloudinary configuré avec:', {
   api_secret: process.env.CLOUDINARY_API_SECRET ? '✅' : '❌',
 });
 
-// 🔥 Storage pour Multer avec ressource_type 'raw' pour les fichiers
+// 🔥 Storage pour Multer
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
-    // 🔥 Déterminer le type de ressource en fonction du type de fichier
     const ext = file.originalname.split('.').pop().toLowerCase();
     const documentTypes = ['pdf', 'docx', 'doc', 'ppt', 'pptx', 'xls', 'xlsx'];
     const imageTypes = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'];
@@ -41,7 +40,7 @@ const storage = new CloudinaryStorage({
       };
     }
     
-    // 🔥 Pour les documents (PDF, DOCX, PPT)
+    // 🔥 Pour les documents (PDF, DOCX, PPT) - STOCKER EN RAW
     if (documentTypes.includes(ext)) {
       return {
         folder: 'bibliotheque/documents',

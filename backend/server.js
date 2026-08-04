@@ -180,7 +180,6 @@ app.post('/api/books', auth, upload.fields([
       return res.status(400).json({ error: 'Le titre est requis' });
     }
 
-    // URLs Cloudinary
     const fileUrl = file.path;
     const coverUrl = cover ? cover.path : null;
 
@@ -293,7 +292,7 @@ app.get('/api/books/:id', async function(req, res) {
   }
 });
 
-// ===== TÉLÉCHARGEMENT AVEC CLOUDINARY =====
+// ===== TÉLÉCHARGEMENT DES FICHIERS =====
 app.get('/api/books/:id/download', async function(req, res) {
   try {
     const result = await pool.query(
@@ -308,14 +307,26 @@ app.get('/api/books/:id/download', async function(req, res) {
     const book = result.rows[0];
     console.log('📥 Téléchargement:', book.file_name);
 
-    // 🔥 Incrémenter les téléchargements
     await pool.query('UPDATE books SET downloads = downloads + 1 WHERE id = $1', [req.params.id]);
 
     // 🔥 Si c'est une URL Cloudinary
     if (book.file_url && book.file_url.includes('cloudinary.com')) {
-      // 🔥 Générer l'URL de téléchargement direct
-      const downloadUrl = book.file_url.replace('/upload/', '/upload/fl_attachment/');
-      console.log('📥 URL de téléchargement Cloudinary:', downloadUrl);
+      // 🔥 Extraire le public_id
+      const urlParts = book.file_url.split('/');
+      const publicId = urlParts.slice(urlParts.indexOf('upload') + 2).join('/');
+      
+      console.log('📥 Public ID:', publicId);
+      
+      // 🔥 Générer l'URL de téléchargement avec le flag "attachment" et le bon format
+      // Pour les fichiers raw, on utilise la ressource_type 'raw'
+      const downloadUrl = cloudinary.url(publicId, {
+        resource_type: 'raw',
+        flags: 'attachment',
+        format: path.extname(book.file_name).substring(1),
+        filename: book.file_name
+      });
+      
+      console.log('📥 URL de téléchargement:', downloadUrl);
       return res.json({ success: true, downloadUrl: downloadUrl });
     }
 
