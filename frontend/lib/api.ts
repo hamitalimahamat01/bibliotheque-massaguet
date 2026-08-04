@@ -1,9 +1,6 @@
 import axios from 'axios';
 
-// Utiliser l'URL du backend Render en production, ou localhost en développement
-const API_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://bibliotheque-backend-wfkn.onrender.com/api'
-  : 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://bibliotheque-backend-wfkn.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -11,7 +8,6 @@ const api = axios.create({
   timeout: 30000,
 });
 
-// Intercepteur pour ajouter le token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -20,7 +16,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Intercepteur pour gérer les erreurs
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -35,7 +30,6 @@ api.interceptors.response.use(
   }
 );
 
-// ===== AUTH =====
 export const authApi = {
   register: (data: { name: string; email: string; password: string }) =>
     api.post('/auth/register', data),
@@ -46,7 +40,6 @@ export const authApi = {
   logout: () => api.post('/auth/logout'),
 };
 
-// ===== BOOKS =====
 export const booksApi = {
   getAll: (params?: any) => api.get('/books', { params }),
   getById: (id: string) => api.get(`/books/${id}`),
@@ -56,15 +49,31 @@ export const booksApi = {
     }),
   update: (id: string, data: any) => api.put(`/books/${id}`, data),
   delete: (id: string) => api.delete(`/books/${id}`),
-  download: (id: string) => api.get(`/books/${id}/download`),
+  // 🔥 Téléchargement - suivre la redirection
+  download: async (id: string) => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://bibliotheque-backend-wfkn.onrender.com';
+    const response = await fetch(`${baseUrl}/api/books/${id}/download`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      redirect: 'follow',
+    });
+    
+    if (response.ok) {
+      // Si c'est une redirection, obtenir l'URL finale
+      const finalUrl = response.url;
+      return { data: { downloadUrl: finalUrl } };
+    } else {
+      throw new Error('Erreur de téléchargement');
+    }
+  },
 };
 
-// ===== CATEGORIES =====
 export const categoriesApi = {
   getAll: () => api.get('/categories'),
 };
 
-// ===== STATS =====
 export const statsApi = {
   getStats: () => api.get('/documents/stats'),
 };

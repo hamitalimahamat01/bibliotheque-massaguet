@@ -27,6 +27,7 @@ interface Book {
   views: number;
   createdAt: string;
   uploadedBy?: { id: string; name: string; email: string };
+  uploaded_by_name?: string;
 }
 
 export default function BookDetailPage() {
@@ -76,20 +77,24 @@ export default function BookDetailPage() {
     
     setDownloading(true);
     try {
-      const res: any = await booksApi.download(book.id);
+      // 🔥 Utiliser la nouvelle méthode de téléchargement
+      const res = await booksApi.download(book.id);
+      console.log('📥 Réponse téléchargement:', res);
       
       if (res.data?.downloadUrl) {
+        // Ouvrir dans un nouvel onglet
         window.open(res.data.downloadUrl, '_blank');
-        toast.success('Téléchargement démarré !');
-      } else if (book.fileUrl) {
-        window.open(book.fileUrl, '_blank');
         toast.success('Téléchargement démarré !');
       } else {
         toast.error('URL de téléchargement non disponible');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erreur téléchargement:', error);
-      toast.error('Erreur lors du téléchargement');
+      // 🔥 Fallback: essayer directement l'URL
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://bibliotheque-backend-wfkn.onrender.com';
+      const downloadUrl = `${baseUrl}/api/books/${book.id}/download`;
+      window.open(downloadUrl, '_blank');
+      toast.success('Téléchargement démarré !');
     } finally {
       setDownloading(false);
     }
@@ -122,7 +127,6 @@ export default function BookDetailPage() {
   const coverImageUrl = getImageUrl(book.coverUrl);
   const hasCover = coverImageUrl && coverImageUrl.length > 0;
 
-  // 🔥 Gérer le cas où fileType est undefined
   const fileType = book.fileType || 'pdf';
   const fileTypeUpper = fileType.toUpperCase();
 
@@ -146,11 +150,17 @@ export default function BookDetailPage() {
     return labels[fileType] || fileTypeUpper;
   };
 
-  const formattedDate = book.createdAt ? new Date(book.createdAt).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }) : 'Date inconnue';
+  const formattedDate = book.createdAt 
+    ? new Date(book.createdAt).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'Date inconnue';
+
+  const uploadedByName = book.uploadedBy?.name || book.uploaded_by_name || 'Anonyme';
 
   return (
     <div className="animate-fade-in max-w-5xl mx-auto px-4">
@@ -207,7 +217,7 @@ export default function BookDetailPage() {
                 </h1>
                 <p className="text-gray-500 mt-2 flex items-center gap-2">
                   <Icons.User className="w-4 h-4" />
-                  par <span className="font-medium text-gray-700">{book.author || 'Anonyme'}</span>
+                  <span><span className="font-medium">Auteur :</span> {book.author || 'Anonyme'}</span>
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -260,7 +270,7 @@ export default function BookDetailPage() {
               <span className="w-px h-4 bg-gray-300" />
               <span className="flex items-center gap-2">
                 <Icons.Clock className="w-4 h-4" />
-                {formattedDate}
+                Publié le {formattedDate}
               </span>
               {book.fileSize > 0 && (
                 <>
@@ -297,7 +307,7 @@ export default function BookDetailPage() {
             <div className="mt-4 text-center text-xs text-gray-400">
               <span>Partagé par </span>
               <span className="font-medium text-gray-500">
-                {book.uploadedBy?.name || 'Anonyme'}
+                {uploadedByName}
               </span>
               <span className="mx-2">•</span>
               <span>Fichier: {book.fileName || 'Document'}</span>
